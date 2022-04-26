@@ -13,7 +13,7 @@
 SEC("xdp")
 int xdp_pass_main(struct xdp_md* ctx) {
 
-    bpf_debug("Return XDP_PASS\n");
+    //bpf_debug("Return XDP_PASS\n");
 
     return XDP_PASS;
 }
