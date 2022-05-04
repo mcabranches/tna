@@ -2,12 +2,15 @@
 #define USER_UTIL_H
 
 #include <bpf/libbpf.h>
+#include <stdlib.h>
+#include <string.h>
 
+//convert this to a class with methods to manage the attributes
 struct tna_interface {
 	int ifindex;
 	int master_index;
 	uint8_t op_state;
-	char ifname[16];
+	std::string ifname;
 };
 
 
