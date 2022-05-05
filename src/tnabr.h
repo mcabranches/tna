@@ -14,6 +14,7 @@
 #include <list>
 #include <unordered_map>
 #include <linux/if_link.h>
+#include <bpf/bpf.h>
 #include "util.h"
 #include "xdp_brfdb.skel.h"
 
@@ -52,7 +53,7 @@ class Tnabr {
 			if (!skel) {
 
 				throw std::runtime_error("Failed to open xdp_brfdb skel\n");
-				
+
 				return -1;
 			}
 
@@ -64,7 +65,7 @@ class Tnabr {
 				destroy_tnabr();
 				return -2;
 			}
-			else
+			else 
 				return 0;
 		}
 
@@ -128,6 +129,11 @@ class Tnabr {
 
 				cout << "Installing XDP tnabr accel on ifname: " << it->ifname << endl;
 
+				map_fd = bpf_map__fd(skel->maps.tx_port);
+
+				if ((bpf_map_update_elem(map_fd, &it->ifindex, &it->ifindex, BPF_ANY)) != 0)
+					cout << "Could not update redirect map contents ..." << endl;
+
 				install_xdp_tnabr(it->ifindex);
 			}
 			return 0;
@@ -144,6 +150,8 @@ class Tnabr {
 		int _ifindex;
 		int _flags = XDP_FLAGS_SKB_MODE; /* default */
 		unordered_map<string, struct tna_bridge> tnabrs;
+		int map_fd;
+		//struct bpf_map *map;
 
 		int _destroy_tnabr(void)
 		{
@@ -161,7 +169,7 @@ class Tnabr {
 		}
 
 		int install_xdp_tnabr(int ifindex) {
-			int err = util::install_xdp(skel->progs.xdp_pass_main, ifindex, _flags);
+			int err = util::install_xdp(skel->progs.xdp_br_main_0, ifindex, _flags);
 			if (err < 0) {
 
 				throw std::runtime_error("Failed to install tnabr code\n");

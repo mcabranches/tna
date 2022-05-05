@@ -8,10 +8,11 @@ BPFTOOL_SRC := $(abspath ../bpftool/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 BPFTOOL ?= $(abspath $(OUTPUT)/bpftool/bpftool)
 VMLINUX := ../vmlinux/vmlinux.h
+ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 # Use our own libbpf API headers and Linux UAPI headers distributed with
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
-INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX))
+INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I../common
 CXXFLAGS := -g -Wall
 
 XDP_APPS = xdp_brfdb xdp_rtr xdp_mon
@@ -44,7 +45,7 @@ $(BPFTOOL): $(LIBBPF_OBJ) | $(dir $(BPFTOOL))
 
 # Build kernel side xdp/bpf apps
 $(XDP_APPS): $(patsubst %, %.bpf.c, $(APPS)) | $(OUTPUT) $(BPFTOOL) $(LIBBPF_OBJ) $(VMLINUX)
-	$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -c $@.bpf.c  -o $(OUTPUT)/$@.bpf.o
+	$(CLANG) -g -O2 -Wall -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -c $@.bpf.c  -o $(OUTPUT)/$@.bpf.o
 	$(LLVM_STRIP) -g $(OUTPUT)/$@.bpf.o # strip useless DWARF info
 	$(BPFTOOL) gen skeleton $(OUTPUT)/$@.bpf.o > $(OUTPUT)/$@.skel.h
 
