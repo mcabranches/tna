@@ -1,8 +1,5 @@
 # xdp-tna
 
-## Instalation
-    git submodule update --init --recursive
-
 ## Compilation
 
     cd src/
