@@ -489,6 +489,7 @@ LIBBPF_API int bpf_task_fd_query(int pid, int fd, __u32 flags, char *buf,
 				 __u64 *probe_offset, __u64 *probe_addr);
 
 enum bpf_stats_type /* defined in up-to-date linux/bpf.h */
+//m-> changed to solve c++ compilation error (https://github.com/libbpf/libbpf/issues/249)
 #ifdef __cplusplus
 : int
 #endif

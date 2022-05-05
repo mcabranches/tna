@@ -4358,4 +4358,5 @@ static long (*bpf_ima_file_hash)(struct file *file, void *dst, __u32 size) = (vo
  */
 static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *) 194;
 
+//m-> added support to bpf_fdb_lookup
 static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen, unsigned char *src_mac, unsigned char *dst_mac) = (void *) 186;
