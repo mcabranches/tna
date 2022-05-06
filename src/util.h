@@ -2,17 +2,40 @@
 #define USER_UTIL_H
 
 #include <bpf/libbpf.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <cstdlib>
+#include <stdexcept>
+#include <iostream>
+#include <linux/if_link.h>
+#include <list>
+#include <iterator>
+#include <unordered_map>
+
+using namespace std;
 
 //convert this to a class with methods to manage the attributes
+//merge the two structs bellow
 struct tna_interface {
 	int ifindex;
 	int master_index;
 	uint8_t op_state;
-	std::string ifname;
+	string ifname;
+	string type;
+	string op_state_str;
+	string mac_addr_str;
 };
 
+//add atributes related to STP and vlans
+//convert this to a class with methods to manage the attributes
+struct tna_bridge {
+	string brname;
+	list<struct tna_interface> brifs;
+};
 
 namespace util {
 
@@ -23,7 +46,7 @@ namespace util {
     }
 
     static int install_xdp(struct bpf_program *xdp_prog, int ifindex, int xdp_flags)
-    {	
+    {
 	    int bpf_prog_fd = bpf_program__fd(xdp_prog);
 
 	    if (bpf_xdp_attach(ifindex, bpf_prog_fd, xdp_flags, NULL) < 0) {

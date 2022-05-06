@@ -1,36 +1,15 @@
 #ifndef TNABR_H
 #define TNABR_H
 
-#include <signal.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <cstdlib>
-#include <stdexcept>
-#include <iostream>
-#include <iterator>
-#include <list>
-#include <unordered_map>
-#include <linux/if_link.h>
 #include <bpf/bpf.h>
 #include "util.h"
 #include "xdp_brfdb.skel.h"
 
-using namespace std;
-
-
-//add atributes related to STP and vlans
-//convert this to a class with methods to manage the attributes
-struct tna_bridge {
-	string brname;
-	list<struct tna_interface> brifs;
-};
 
 class Tnabr {
 	public:
-		Tnabr(int flags) {
+		Tnabr(int flags) 
+		{
 			if (flags < 0)
 				throw std::invalid_argument("tnabr: invalid xdp flags");
 			else
@@ -39,15 +18,20 @@ class Tnabr {
 			load_bpf();
 		}
 
-		Tnabr(void) {
+		Tnabr(void)
+		{
 			load_bpf();
 		}
 
-		~Tnabr(void) {
+		~Tnabr(void) 
+		{
 			destroy_tnabr();
         }
 
-		int load_bpf(void) {
+		unordered_map<string, struct tna_bridge> tnabrs;
+
+		int load_bpf(void) 
+		{
 			/* Load and verify BPF application */
 			skel = xdp_brfdb_bpf__open();
 			if (!skel) {
@@ -69,7 +53,8 @@ class Tnabr {
 				return 0;
 		}
 
-		int add_tna_bridge(struct tna_bridge tnabridge) {
+		int add_tna_bridge(struct tna_bridge tnabridge) 
+		{
 			tnabrs[tnabridge.brname] = tnabridge;
 
 			cout << "Created tna bridge: " << tnabridge.brname << endl;
@@ -77,7 +62,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int get_tna_bridges(void) {
+		int get_tna_bridges(void) 
+		{
 			unordered_map<string, struct tna_bridge>::iterator it;
 
 			cout << "Available TNA bridges: " << endl;
@@ -88,7 +74,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int add_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface tnainterface) {
+		int add_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface tnainterface) 
+		{
 
 			cout << "Adding interface " << tnainterface.ifname << " to TNA bridge " << tnabridge.brname << endl;
 
@@ -97,7 +84,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int remove_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface tnainterface) {
+		int remove_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface tnainterface) 
+		{
 			list<struct tna_interface>::iterator it;
 
 			cout << "Removing interface " << tnainterface.ifindex << " from TNA bridge " << tnabridge.brname << endl;
@@ -112,7 +100,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int get_br_tna_interfaces(struct tna_bridge tnabridge) {
+		int get_br_tna_interfaces(struct tna_bridge tnabridge) 
+		{
 			list<struct tna_interface>::iterator it;
 
 			cout << "Available interfaces in TNA bridge " << tnabridge.brname << endl;
@@ -123,7 +112,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int accel_tna_bridge(struct tna_bridge tnabridge) {
+		int accel_tna_bridge(struct tna_bridge tnabridge) 
+		{
 			list<struct tna_interface>::iterator it;
 			for (it = tnabrs[tnabridge.brname].brifs.begin(); it != tnabrs[tnabridge.brname].brifs.end(); ++it) {
 
@@ -139,7 +129,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int destroy_tnabr(void) {
+		int destroy_tnabr(void) 
+		{
 			_destroy_tnabr();
 			return 0;
 		}
@@ -148,10 +139,8 @@ class Tnabr {
 		int ret;
 		struct xdp_brfdb_bpf *skel;
 		int _ifindex;
-		int _flags = XDP_FLAGS_SKB_MODE; /* default */
-		unordered_map<string, struct tna_bridge> tnabrs;
+		int _flags = XDP_FLAGS_HW_MODE; /* default */
 		int map_fd;
-		//struct bpf_map *map;
 
 		int _destroy_tnabr(void)
 		{
@@ -168,7 +157,8 @@ class Tnabr {
 			return 0;
 		}
 
-		int install_xdp_tnabr(int ifindex) {
+		int install_xdp_tnabr(int ifindex) 
+		{
 			int err = util::install_xdp(skel->progs.xdp_br_main_0, ifindex, _flags);
 			if (err < 0) {
 
@@ -179,7 +169,8 @@ class Tnabr {
 			return err;
 		}
 
-		int uninstall_xdp_tnabr(int ifindex) {
+		int uninstall_xdp_tnabr(int ifindex) 
+		{
 
 			cout << "Uninstalling XDP tnabr accel on interface: " << ifindex << endl;
 

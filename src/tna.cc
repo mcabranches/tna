@@ -1,10 +1,6 @@
-#include <signal.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
-#include <linux/if_link.h>
-#include "tnabr.h"
+#include "tna.h"
+
+using namespace tna;
 
 int stop = 0;
 
@@ -20,26 +16,14 @@ int main(void)
     signal(SIGINT, unload_prog);
 	signal(SIGTERM, unload_prog);
 
-    struct tna_bridge tnabridge;
-    struct tna_interface tnainterface;
-    auto tnabr = Tnabr();
+    //TNA NetLink object
+    Tnanl tnanl = Tnanl();
 
-    tnabridge.brname = "br0";
-    tnabr.add_tna_bridge(tnabridge);
-    //tnabridge.brname = "br1";
-    //tnabr.add_tna_bridge(tnabridge);
-    tnabr.get_tna_bridges();
-    tnainterface.ifindex = 3;
-    tnainterface.ifname = "enp0s3";
-    tnabr.add_if_tna_bridge(tnabridge, tnainterface);
-    tnainterface.ifindex = 4;
-    tnainterface.ifname = "enp0s4";
-    tnabr.add_if_tna_bridge(tnabridge, tnainterface);
-    tnabr.get_br_tna_interfaces(tnabridge);
-    tnabr.accel_tna_bridge(tnabridge);
-    //tnabr.destroy_tnabr();
+    //TNA Tnabr object
+    Tnabr tnabr = Tnabr(XDP_FLAGS_SKB_MODE);
+    //tnanl.dump_cached_interfaces();
+    create_tna_bridge(tnabr, tnanl);
 
-    //tnabr.install_tnabr(3);
     std::cout <<"Starting TNA controller ..." <<  std::endl;
 
     while(!stop) { //controller's main loop

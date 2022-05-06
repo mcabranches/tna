@@ -29,7 +29,6 @@ struct {
 
 SEC("xdpfdb")
 int xdp_br_main_0(struct xdp_md* ctx) {
-    bpf_debug("Return Here\n");
 
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
@@ -46,7 +45,7 @@ int xdp_br_main_0(struct xdp_md* ctx) {
 
 	fdb_params.ifindex = ctx->ingress_ifindex;
 	/* Start parsing */
-	/* need to diable vlan offloads for this to work... "sudo ethtool -K <device> rxvlan off 
+	/* need to disable vlan offloads for VLANs to work... "sudo ethtool -K <device> rxvlan off 
 	 * TNA should call this only if valan filtering is enabled on a bridge. 
 	 * Otherwise parse_ethhdr should be called 
 	 */
@@ -59,6 +58,7 @@ int xdp_br_main_0(struct xdp_md* ctx) {
 	}
 
 	if (fdb_params.egress_ifindex > 0 && fdb_params.flags == 1) {
+		bpf_debug("XDP forward\n");
 		return bpf_redirect_map(&tx_port, fdb_params.egress_ifindex, 0);
 	}
 
