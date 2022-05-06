@@ -14,7 +14,7 @@ int main(void)
 {
     
     signal(SIGINT, unload_prog);
-	signal(SIGTERM, unload_prog);
+    signal(SIGTERM, unload_prog);
 
     //TNA NetLink object
     Tnanl tnanl = Tnanl();
