@@ -15,14 +15,21 @@
 #include <list>
 #include <iterator>
 #include <unordered_map>
+#include <queue>
+#include <condition_variable>
+#include <mutex>
+
 
 using namespace std;
+
+
 
 //convert this to a class with methods to manage the attributes
 //merge the two structs bellow
 struct tna_interface {
 	int ifindex;
 	int master_index;
+	uint8_t is_veth;
 	uint8_t op_state;
 	string ifname;
 	string type;
@@ -36,6 +43,7 @@ struct tna_bridge {
 	string brname;
 	list<struct tna_interface> brifs;
 };
+
 
 namespace util {
 
