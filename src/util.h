@@ -40,7 +40,9 @@ struct tna_interface {
 //add atributes related to STP and vlans
 //convert this to a class with methods to manage the attributes
 struct tna_bridge {
+	uint8_t op_state;
 	string brname;
+	string op_state_str;
 	list<struct tna_interface> brifs;
 };
 

@@ -35,16 +35,18 @@
 
 namespace tnanl_g_ns {
 	//signal nl events
-    pthread_mutex_t mnl1;
-    pthread_cond_t cvnl1;
-    queue<struct tna_interface> tnabr_addlink_q;
-    queue<struct tna_interface> tnabr_dellink_q;
+    pthread_mutex_t mnl1 = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cvnl1 = PTHREAD_COND_INITIALIZER;
 
-    int tnanl_event_type = 0;
+
+    volatile int tnanl_event_type = 0;
+
+    struct tna_interface interface_g = {0};
 
     int clean_g_ns(void)
     {
         pthread_mutex_lock(&tnanl_g_ns::mnl1);
+        tnanl_event_type = 1;
         pthread_cond_signal(&cvnl1);
         pthread_mutex_unlock(&tnanl_g_ns::mnl1);
 
@@ -68,6 +70,8 @@ class Tnanl {
        {
             close_nlr_q();
             drop_membership_nlr();
+            pthread_cond_destroy(&tnanl_g_ns::cvnl1);
+            pthread_mutex_destroy(&tnanl_g_ns::mnl1);
        }
 
         void dump_cached_interfaces(void)
@@ -103,6 +107,8 @@ class Tnanl {
                     master_index = interfaces[i].ifindex;
                     struct tna_bridge tnabridge;
                     tnabridge.brname = interfaces[i].ifname;
+                    tnabridge.op_state = interfaces[i].op_state;
+                    tnabridge.op_state_str = interfaces[i].op_state_str;
                     tnabr->add_tna_bridge(tnabridge);
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
@@ -121,26 +127,30 @@ class Tnanl {
             list<struct tna_interface>::iterator if_it;
             struct tna_bridge tnabridge;
 
-            /*cout << "\n\nEVENT_TYPE: " << event_type << endl;
-            cout << "ifname: " << interface.ifname << endl;
-            cout << "ifindex: " << interface.ifindex << endl;
-            cout << "master_index: " << interface.master_index << endl;
-            cout << "type: " << interface.type << endl;
-            cout << "opstate: " << interface.op_state_str << endl << endl;*/
+
+            //cout << "\n\nEVENT_TYPE: " << event_type << endl;
+            //cout << "n_ifname: " << interface.ifname << endl;
+            //cout << "ifindex: " << interface.ifindex << endl;
+            //cout << "master_index: " << interface.master_index << endl;
+            //cout << "n_type: " << interface.type << endl;
+            //cout << "n_opstate: " << interface.op_state_str << endl << endl;
 
             if (event_type == 1) {
 
                 if (interface.type == "bridge") {
+                    tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
                     tnabridge.brname = interface.ifname;
 
                     if (tnabr->tnabrs[interface.ifname].brname == interface.ifname) {
-                        if (interface.op_state_str == "down") {
+
+                        if (interface.op_state_str == "up") {
 
                             for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
-					            tnabr->uninstall_xdp_tnabr(if_it->ifindex);
+					            tnabr->install_xdp_tnabr(if_it->ifindex);
 				            }
 
                         }
+
                     }
                     else {
                         tnabr->add_tna_bridge(tnabridge);
@@ -160,6 +170,9 @@ class Tnanl {
                         for (if_it = tnabr->tnabrs[br_name].brifs.begin(); if_it != tnabr->tnabrs[br_name].brifs.end(); ++if_it) {
                                 if (if_it->ifindex == interface.ifindex) {
                                     ifs_exists = 1;
+                                    if (interface.op_state_str == "down")
+                                        tnabr->uninstall_xdp_tnabr(interface.ifindex);        
+
                                     break;
                                 }
 				        }
@@ -167,6 +180,9 @@ class Tnanl {
                             if (br_name) {
                                 tnabridge.brname = br_name;
                                 tnabr->add_if_tna_bridge(tnabridge, interface);
+                                
+                                if (tnabr->tnabrs[br_name].op_state_str == "up")
+                                    tnabr->install_xdp_tnabr(interface.ifindex);
                             }
                         }
 
@@ -192,6 +208,14 @@ class Tnanl {
 
                 }
 
+            }
+            if (event_type == 3) {
+                tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
+                if (interface.op_state_str == "down") {
+                    for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
+					    tnabr->uninstall_xdp_tnabr(if_it->ifindex);
+				    }
+                }
             }
         }
 
@@ -274,29 +298,38 @@ class Tnanl {
 
             }
 
-            //cout << "ifi_change: " << if_info->ifi_change << endl;
+            //cout << "\nifi_change: " << if_info->ifi_change << endl;
             //cout << "ifi_flags " << if_info->ifi_flags << endl;
 
-            /*cout << "MSG_TYPE: " << (int) nlh->nlmsg_type << endl;
-            cout << "ifname: " << ifs_entry.ifname << endl;
-            cout << "ifindex: " << ifs_entry.ifindex << endl;
-            cout << "master_index: " << ifs_entry.master_index << endl;
-            cout << "type: " << ifs_entry.type << endl;
-            cout << "opstate: " << ifs_entry.op_state_str << endl;*/
-    
-   
-            pthread_mutex_lock(&tnanl_g_ns::mnl1);
-            
-            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (if_info->ifi_change > 0)) {
+            //cout << "MSG_TYPE: " << (int) nlh->nlmsg_type << endl;
+            //cout << "ifname: " << ifs_entry.ifname << endl;
+            //cout << "ifindex: " << ifs_entry.ifindex << endl;
+            //cout << "master_index: " << ifs_entry.master_index << endl;
+            //cout << "type: " << ifs_entry.type << endl;
+            //cout << "opstate: " << ifs_entry.op_state_str << endl;
+
+            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 0)) {
                 event_type = 1;
-                tnanl_g_ns::tnabr_addlink_q.push(ifs_entry);
+            }
+            
+            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "Null") && (if_info->ifi_change > 0)) {
+                event_type = 1;
             }
 
             if ((int) nlh->nlmsg_type == RTM_DELLINK) {
                 event_type = 2;
-                tnanl_g_ns::tnabr_dellink_q.push(ifs_entry);
             }
+
+            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 1)) {
+                if (if_info->ifi_flags == 4098)
+                    event_type = 3;
+            }
+
+            pthread_mutex_lock(&tnanl_g_ns::mnl1);
+
             tnanl_g_ns::tnanl_event_type = event_type;
+
+            tnanl_g_ns::interface_g = ifs_entry;
             
             pthread_cond_signal(&tnanl_g_ns::cvnl1);
             pthread_mutex_unlock(&tnanl_g_ns::mnl1);
