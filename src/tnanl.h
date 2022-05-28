@@ -14,6 +14,7 @@
 */
 #include <netlink/netlink.h>
 #include <netlink/route/link.h>
+#include <netlink/route/link/vlan.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/neighbour.h>
 #include <netlink/route/neightbl.h>
@@ -24,6 +25,8 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/netfilter.h>
+#include <linux/if_bridge.h>
+#include <linux/if_link.h>
 #include <netinet/ether.h>
 #include <net/if.h>
 #include <errno.h>
@@ -33,13 +36,12 @@
 
 #define MAX_INTERFACES 32
 
+
 namespace tnanl_g_ns {
 	//signal nl events
     pthread_mutex_t mnl1 = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cvnl1 = PTHREAD_COND_INITIALIZER;
-
-
-    volatile int tnanl_event_type = 0;
+    int tnanl_event_type = 0;
 
     struct tna_interface interface_g = {0};
 
@@ -119,14 +121,28 @@ class Tnanl {
                     tnabr->accel_tna_bridge(tnabridge); //move this to tna.h   
                 }
             }
-
         }
+
 
         void update_tna_bridge(Tnabr *tnabr, struct tna_interface interface, int event_type)
         {
-            list<struct tna_interface>::iterator if_it;
-            struct tna_bridge tnabridge;
+            unordered_map<string, struct tna_bridge>::iterator br_it;
+            unordered_map<string, struct tna_interface>::iterator if_it;
+            unordered_map<int, struct tna_vlan>::iterator vlan_it;
 
+            struct tna_bridge tnabridge;
+            char *br_name;
+
+            if (interface.type == "bridge") {
+                tnabridge.brname = interface.ifname;
+                tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
+            }
+            else {
+                br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);
+                if_indextoname(interface.master_index, br_name);
+
+                tnabr->tnabrs[br_name].brifs[interface.ifname].op_state_str = interface.op_state_str;;
+            }
 
             //cout << "\n\nEVENT_TYPE: " << event_type << endl;
             //cout << "n_ifname: " << interface.ifname << endl;
@@ -146,7 +162,8 @@ class Tnanl {
                         if (interface.op_state_str == "up") {
 
                             for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
-					            tnabr->install_xdp_tnabr(if_it->ifindex);
+                                if (if_it->second.op_state_str == "up")
+					                tnabr->install_xdp_tnabr(if_it->second);
 				            }
 
                         }
@@ -168,10 +185,10 @@ class Tnanl {
                         if_indextoname(interface.master_index, br_name);
 
                         for (if_it = tnabr->tnabrs[br_name].brifs.begin(); if_it != tnabr->tnabrs[br_name].brifs.end(); ++if_it) {
-                                if (if_it->ifindex == interface.ifindex) {
+                                if (if_it->second.ifindex == interface.ifindex) {
                                     ifs_exists = 1;
                                     if (interface.op_state_str == "down")
-                                        tnabr->uninstall_xdp_tnabr(interface.ifindex);        
+                                        tnabr->uninstall_xdp_tnabr(interface);        
 
                                     break;
                                 }
@@ -182,7 +199,7 @@ class Tnanl {
                                 tnabr->add_if_tna_bridge(tnabridge, interface);
                                 
                                 if (tnabr->tnabrs[br_name].op_state_str == "up")
-                                    tnabr->install_xdp_tnabr(interface.ifindex);
+                                    tnabr->install_xdp_tnabr(interface);
                             }
                         }
 
@@ -196,12 +213,8 @@ class Tnanl {
 
                 }
 
-
                 if (interface.type == "Null") {
                     if (interface.master_index != 0) {
-            
-                        char *br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);;
-                        if_indextoname(interface.master_index, br_name);
                         tnabridge.brname = br_name;
                         tnabr->remove_if_tna_bridge(tnabridge, interface);
                     }
@@ -210,11 +223,60 @@ class Tnanl {
 
             }
             if (event_type == 3) {
-                tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
                 if (interface.op_state_str == "down") {
                     for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
-					    tnabr->uninstall_xdp_tnabr(if_it->ifindex);
+					    tnabr->uninstall_xdp_tnabr(if_it->second);
 				    }
+                }
+            }
+            if (event_type == 4) {
+                tnabr->install_xdp_tnabr(interface);
+            }
+
+            if (event_type == 5) {
+
+                /* Update vlan state */
+                tnabr->tnabrs[br_name].brifs[interface.ifname].vlans = interface.vlans;
+
+                /* Verify vlans and tagging on deployed bridges -- this will custmize the deployed XDP code */
+                for (br_it = tnabr->tnabrs.begin(); br_it != tnabr->tnabrs.end(); ++br_it) {
+                    br_it->second.has_vlan = 0;
+                    br_it->second.has_untagged_vlan = 0;
+
+                    for (if_it = br_it->second.brifs.begin(); if_it != br_it->second.brifs.end(); ++if_it) {
+                    
+                        for (vlan_it = if_it->second.vlans.begin(); vlan_it != if_it->second.vlans.end(); ++vlan_it) {
+                        
+                            if (vlan_it->second.vid > 1) {
+                                br_it->second.has_vlan |= 1;
+                                if (vlan_it->second.is_untagged_vlan == 1) {
+                                    br_it->second.has_untagged_vlan |= 1;
+                                }
+                                else {
+                                    br_it->second.has_untagged_vlan |= 0;
+                                }
+
+                            }
+                            else {
+                                br_it->second.has_vlan |= 0;
+                                br_it->second.has_untagged_vlan |= 0;
+                            }
+
+                        }
+                    }
+
+                    if (br_it->second.brname != "") {
+                        if (br_it->second.has_vlan) {
+                            cout << "Detected VLAN on BR: " << br_it->second.brname << endl;
+                            if (br_it->second.has_untagged_vlan) {
+                                cout << "Detected untagged VLAN on BR: " << br_it->second.brname << endl;
+                            }
+                        }
+                        else {
+                            cout << "No VLANs were detected on BR " << br_it->second.brname << endl;
+                        }
+
+                    }
                 }
             }
         }
@@ -251,7 +313,8 @@ class Tnanl {
     
             struct nlmsghdr* nlh = nlmsg_hdr(msg);
             struct ifinfomsg* if_info = (struct ifinfomsg*) (nlmsg_data(nlh));
-            struct tna_interface ifs_entry = {0};
+            struct bridge_vlan_info *vinfo;
+            struct tna_interface ifs_entry = { 0 };
             int event_type = 0;
 
             struct nlattr *attrs[IFLA_MAX+1];
@@ -264,18 +327,15 @@ class Tnanl {
                 cout << "Error parsing NL attributes\n";            
             }
 
-
             if (attrs[IFLA_IFNAME]) {
                 ifs_entry.ifname = nla_get_string(attrs[IFLA_IFNAME]);
             }
 
-            if (attrs[IFLA_MASTER])
-            {
+            if (attrs[IFLA_MASTER]) {
                 ifs_entry.master_index = nla_get_u32(attrs[IFLA_MASTER]);
             }
 
-            if (attrs[IFLA_OPERSTATE])
-            {
+            if (attrs[IFLA_OPERSTATE]) {
                 char op_state_c[32];
                 ifs_entry.op_state = nla_get_u32(attrs[IFLA_OPERSTATE]);
                 rtnl_link_operstate2str(ifs_entry.op_state, op_state_c, sizeof(op_state_c));
@@ -287,7 +347,7 @@ class Tnanl {
                 struct nlattr *li[IFLA_INFO_MAX+1];
 
                 if (nla_parse_nested(li, IFLA_INFO_MAX, attrs[IFLA_LINKINFO], rtln_link_policy) < 0) {
-                      /* error */
+                    /* error */
                     cout << "Error parsing nested NL attributes\n";  
                 }
                 if (li[IFLA_INFO_KIND]) {
@@ -295,25 +355,55 @@ class Tnanl {
                     if (kind) 
                         ifs_entry.type = kind;
                 }
-
             }
 
+            if (attrs[IFLA_AF_SPEC]) {
+                struct nlattr *af_attr;
+                int remaining;
+
+                nla_for_each_nested(af_attr, attrs[IFLA_AF_SPEC], remaining) {
+                    if (af_attr->nla_type == IFLA_BRIDGE_VLAN_INFO) {
+                        vinfo = (struct bridge_vlan_info *) nla_data(af_attr);
+                        if (vinfo->vid > 1) {
+                            /* build a list of active VLANs on an interface */
+                            ifs_entry.vlans[vinfo->vid].vid = vinfo->vid;
+                            if (vinfo->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
+                                ifs_entry.vlans[vinfo->vid].is_untagged_vlan = 1;
+                            }
+                            else {
+                                ifs_entry.vlans[vinfo->vid].is_untagged_vlan = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            //if (attrs[IFLA_AF_SPEC]) {
+            //    ifs_entry.xdp_set = 1;
+            //}
+
+            //cout << "family: " << if_info->ifi_family << endl;
+            //cout << "type: " << if_info->ifi_type << endl;
             //cout << "\nifi_change: " << if_info->ifi_change << endl;
             //cout << "ifi_flags " << if_info->ifi_flags << endl;
 
             //cout << "MSG_TYPE: " << (int) nlh->nlmsg_type << endl;
             //cout << "ifname: " << ifs_entry.ifname << endl;
-            //cout << "ifindex: " << ifs_entry.ifindex << endl;
-            //cout << "master_index: " << ifs_entry.master_index << endl;
-            //cout << "type: " << ifs_entry.type << endl;
-            //cout << "opstate: " << ifs_entry.op_state_str << endl;
+            //cout << "vid: " << ifs_entry.cur_vlan.vid << endl;
+            //cout << "has_untagged_vlan: " << ifs_entry.cur_vlan.is_untagged_vlan << endl;
+            
 
             if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 0)) {
                 event_type = 1;
             }
             
             if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "Null") && (if_info->ifi_change > 0)) {
-                event_type = 1;
+                if ((if_info->ifi_flags & IFF_UP) && if_info->ifi_change != 256 ) {
+                        event_type = 4;
+                }
+                else {
+                    event_type = 1;
+                }
             }
 
             if ((int) nlh->nlmsg_type == RTM_DELLINK) {
@@ -321,8 +411,16 @@ class Tnanl {
             }
 
             if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 1)) {
-                if (if_info->ifi_flags == 4098)
+                if (!(if_info->ifi_flags & IFF_UP)) {
                     event_type = 3;
+                }
+            }
+            /* event type 5 -> update vlan state */
+            //else
+            //    event_type = 5; 
+
+            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "Null") && (if_info->ifi_change == 0)) {
+                event_type = 5;
             }
 
             pthread_mutex_lock(&tnanl_g_ns::mnl1);
@@ -405,8 +503,11 @@ class Tnanl {
                 ifs_entry->type = "Null";
 
             ifs_entry->master_index = rtnl_link_get_master(rtnl_link);
+            
+            get_initial_br_vlan_info(ifs_entry);
 
-            //rtnl_link_put(rtnl_link);
+            rtnl_link_put(rtnl_link);
+
         }
 
         static void *tna_mon_nl(void *args) {
@@ -414,6 +515,94 @@ class Tnanl {
             while(true) {
                 nl_recvmsgs_default(sock);
             }
+        }
+
+        static int nlr_br_vlan_cb_func(struct nl_msg *msg, void *interface)
+        {
+            struct tna_interface *ifs_entry = (struct tna_interface *) interface;
+            struct nlmsghdr* nlh = nlmsg_hdr(msg);
+            struct ifinfomsg* if_info = (struct ifinfomsg*) (nlmsg_data(nlh));
+            struct nlattr *nla = nlmsg_attrdata(nlh, 13);
+
+            int remaining = nlmsg_attrlen(nlh, 0);
+
+            if (ifs_entry->ifindex != if_info->ifi_index)
+                return 0;
+
+            while (nla_ok(nla, remaining)) {
+
+                if (nla->nla_type == (IFLA_AF_SPEC)) {
+                    struct nlattr *af_attr;
+                    int remaining;
+
+                    nla_for_each_nested(af_attr, nla, remaining) {
+                        if (af_attr->nla_type == IFLA_BRIDGE_VLAN_INFO) {
+                            struct bridge_vlan_info *vinfo;
+                            vinfo = (struct bridge_vlan_info *) nla_data(af_attr);
+                            if (vinfo->vid > 1) {
+                                cout << "Detected VLAN on BR: " << ifs_entry->master_index << endl;
+                                /* build a list of active VLANs on an interface */
+                                ifs_entry->vlans[vinfo->vid].vid = vinfo->vid;
+                                
+                                if (vinfo->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
+                                    ifs_entry->vlans[vinfo->vid].is_untagged_vlan = 1;
+                                    cout << "Detected untagged VLAN on BR: " << ifs_entry->master_index << endl;
+                                }
+                                else {
+                                    ifs_entry->vlans[vinfo->vid].is_untagged_vlan = 0;
+                                }
+                            }
+                        }
+                    }
+
+                }
+
+                nla = nla_next(nla, &remaining);
+            }
+            
+            return 0;
+        }  
+
+        static void get_initial_br_vlan_info(void *interface)
+        {
+            struct nl_sock *sk;
+
+            struct nl_msg *msg;
+
+            struct tna_interface *ifs_entry = (struct tna_interface *) interface;
+
+            struct ifinfomsg ifi = {
+                .ifi_family = AF_BRIDGE,
+                .ifi_type = ARPHRD_NETROM,
+                .ifi_index = ifs_entry->ifindex,
+            };
+
+            sk = nl_socket_alloc();
+            nl_connect(sk, NETLINK_ROUTE);
+
+            nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, nlr_br_vlan_cb_func, ifs_entry);
+
+            if (!(msg = nlmsg_alloc_simple(RTM_GETLINK, NLM_F_REQUEST|NLM_F_DUMP))) {
+                nl_socket_free(sk);
+                return;
+            }
+
+
+            if (nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO) < 0)
+                goto nla_put_failure;
+            
+            //request VLAN info
+            NLA_PUT_U32(msg, IFLA_EXT_MASK, RTEXT_FILTER_BRVLAN);
+
+            nl_send_auto(sk, msg);
+
+            nl_recvmsgs_default(sk);
+
+            nla_put_failure:
+                cout << "Closing\n";
+                nlmsg_free(msg);
+                nl_socket_free(sk);
+                return;
         }
 };
 

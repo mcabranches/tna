@@ -14,8 +14,6 @@ static void unload_prog(int sig) {
 
 int main(void)
 {
-    //mutex mnl1;
-    //condition_variable cvnl1;
     signal(SIGINT, unload_prog);
     signal(SIGTERM, unload_prog);
 

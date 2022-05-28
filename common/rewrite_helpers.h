@@ -8,13 +8,9 @@
 #ifndef __REWRITE_HELPERS_H
 #define __REWRITE_HELPERS_H
 
-#include <linux/bpf.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/if_ether.h>
+#include "vmlinux.h"
 
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_endian.h>
+#define ETH_ALEN        6                /* Octets in one ethernet addr         */
 
 /* Pops the outermost VLAN tag off the packet. Returns the popped VLAN ID on
  * success or negative errno on failure.

@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 #include "parsing_helpers.h"
+#include "rewrite_helpers.h"
 
 
 /* trace is written to /sys/kernel/debug/tracing/trace_pipe */
@@ -12,12 +13,6 @@
                                      ##__VA_ARGS__);                    \
                 })
 
-//struct bpf_map_def SEC("maps") tx_port = {
-//	.type = BPF_MAP_TYPE_DEVMAP,
-//	.key_size = sizeof(int),
-//	.value_size = sizeof(int),
-//	.max_entries = 10,
-//};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_DEVMAP);
@@ -59,6 +54,9 @@ int xdp_br_main_0(struct xdp_md* ctx) {
 
 	if (fdb_params.egress_ifindex > 0 && fdb_params.flags == 1) {
 		bpf_debug("XDP forward\n");
+		//Is it possible see if the port is untagged via the helper?
+		if (fdb_params.egress_ifindex == 5)
+			vlan_tag_pop(ctx, eth);
 		return bpf_redirect_map(&tx_port, fdb_params.egress_ifindex, 0);
 	}
 

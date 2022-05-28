@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+CXX := g++
 BUILD_DIR = $(abspath ../build/)
 OUTPUT := $(abspath $(BUILD_DIR)/.output)
 CLANG ?= clang

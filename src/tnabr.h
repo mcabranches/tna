@@ -79,40 +79,40 @@ class Tnabr {
 
 			cout << "Adding interface " << tnainterface.ifname << " to TNA bridge " << tnabridge.brname << endl;
 
-			tnabrs[tnabridge.brname].brifs.push_back(tnainterface);
+			tnabrs[tnabridge.brname].brifs[tnainterface.ifname] =  tnainterface; //push_back(tnainterface);
 
 			if ((tnabridge.op_state_str == "up") && (tnainterface.op_state_str == "up"))
-				install_xdp_tnabr(tnainterface.ifindex);
+				install_xdp_tnabr(tnainterface);
 
 			return 0;
 		}
 
 		int remove_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface tnainterface) 
 		{
-			list<struct tna_interface>::iterator it;
+			unordered_map<string, struct tna_interface>::iterator it;
 
 			cout << "Removing interface " << tnainterface.ifindex << " from TNA bridge " << tnabridge.brname << endl;
 			
 			for (it = tnabrs[tnabridge.brname].brifs.begin(); it != tnabrs[tnabridge.brname].brifs.end(); ++it) {
-        		if (it->ifname == tnainterface.ifname) {
-					tnabrs[tnabridge.brname].brifs.erase(it);
+        		if (it->second.ifname == tnainterface.ifname) {
+					tnabrs[tnabridge.brname].brifs.erase(it->first);
 					break;
 				}
 			}
 
-			uninstall_xdp_tnabr(tnainterface.ifindex);
+			uninstall_xdp_tnabr(tnainterface);
 
 			return 0;
 		}
 
 		int get_br_tna_interfaces(struct tna_bridge tnabridge) 
 		{
-			list<struct tna_interface>::iterator it;
+			unordered_map<string, struct tna_interface>::iterator it;
 
 			cout << "Available interfaces in TNA bridge " << tnabridge.brname << endl;
 
 			for (it = tnabrs[tnabridge.brname].brifs.begin(); it != tnabrs[tnabridge.brname].brifs.end(); ++it)
-				cout << "ifname: " << it->ifname << endl;
+				cout << "ifname: " << it->second.ifname << endl;
 
 			return 0;
 		}
@@ -120,18 +120,18 @@ class Tnabr {
 		int accel_tna_bridge(struct tna_bridge tnabridge) 
 		{
 			if (tnabridge.op_state_str == "up") {
-				list<struct tna_interface>::iterator it;
+				unordered_map<string, struct tna_interface>::iterator it;
 				for (it = tnabrs[tnabridge.brname].brifs.begin(); it != tnabrs[tnabridge.brname].brifs.end(); ++it) {
 
 					//cout << "Installing XDP tnabr accel on ifname: " << it->ifname << endl;
 
 					map_fd = bpf_map__fd(skel->maps.tx_port);
 
-					if ((bpf_map_update_elem(map_fd, &it->ifindex, &it->ifindex, BPF_ANY)) != 0)
+					if ((bpf_map_update_elem(map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY)) != 0)
 						cout << "Could not update redirect map contents ..." << endl;
 
-					if (it->op_state_str == "up")
-						install_xdp_tnabr(it->ifindex);
+					if (it->second.op_state_str == "up")
+						install_xdp_tnabr(it->second);
 				}
 			}
 			return 0;
@@ -143,27 +143,31 @@ class Tnabr {
 			return 0;
 		}
 
-		int install_xdp_tnabr(int ifindex) 
+		int install_xdp_tnabr(struct tna_interface interface)
 		{
-			int err = util::install_xdp(skel->progs.xdp_br_main_0, ifindex, _flags);
+			//if (interface.xdp_set)
+			//	return 0;
+
+			int err = util::install_xdp(skel->progs.xdp_br_main_0, interface.ifindex, _flags);
+
 			if (err < 0) {
 
 				throw std::runtime_error("Failed to install tnabr code\n");
 
-				uninstall_xdp_tnabr(ifindex);
+				uninstall_xdp_tnabr(interface);
 			}
 
-			cout << "Installing XDP tnabr accel on interface: " << ifindex << endl;
+			cout << "Installing XDP tnabr accel on interface: " << interface.ifindex << endl;
 
 			return err;
 		}
 
-		int uninstall_xdp_tnabr(int ifindex) 
+		int uninstall_xdp_tnabr(struct tna_interface interface) 
 		{
 
-			cout << "Uninstalling XDP tnabr accel on interface: " << ifindex << endl;
+			cout << "Uninstalling XDP tnabr accel on interface: " << interface.ifindex << endl;
 
-			util::uninstall_xdp(ifindex, _flags);
+			util::uninstall_xdp(interface.ifindex, _flags);
 
 			return 0;
 		}
@@ -178,11 +182,11 @@ class Tnabr {
 		int _destroy_tnabr(void)
 		{
 			unordered_map<string, struct tna_bridge>::iterator br_it;
-			list<struct tna_interface>::iterator if_it;
+			unordered_map<string, struct tna_interface>::iterator if_it;
 
 			for (br_it = tnabrs.begin(); br_it != tnabrs.end(); ++br_it) {
 				for (if_it = br_it->second.brifs.begin(); if_it != br_it->second.brifs.end(); ++if_it) {
-					uninstall_xdp_tnabr(if_it->ifindex);
+					uninstall_xdp_tnabr(if_it->second);
 				}
 			}
 			xdp_brfdb_bpf__destroy(skel);

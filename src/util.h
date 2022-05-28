@@ -22,14 +22,19 @@
 
 using namespace std;
 
+struct tna_vlan {
+	int vid;
+	int is_untagged_vlan;
+};
 
 
-//convert this to a class with methods to manage the attributes
-//merge the two structs bellow
 struct tna_interface {
 	int ifindex;
 	int master_index;
-	uint8_t is_veth;
+	int is_veth;
+	int xdp_set;
+	/* save vlan list for each interface on tna_bridge object */
+	unordered_map<int, struct tna_vlan> vlans;
 	uint8_t op_state;
 	string ifname;
 	string type;
@@ -38,12 +43,13 @@ struct tna_interface {
 };
 
 //add atributes related to STP and vlans
-//convert this to a class with methods to manage the attributes
 struct tna_bridge {
 	uint8_t op_state;
 	string brname;
 	string op_state_str;
-	list<struct tna_interface> brifs;
+	int has_vlan;
+	int has_untagged_vlan;
+	unordered_map<string, struct tna_interface> brifs;
 };
 
 
