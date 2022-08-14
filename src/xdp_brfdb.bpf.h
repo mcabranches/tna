@@ -30,6 +30,7 @@ struct tna_meta_t {
 	struct vlan_hdr *vlh;
     struct bpf_fib_lookup fib_params;
     struct bpf_fdb_lookup fdb_params;
+	struct bpf_ipt_lookup ipt_params;
 };
 
 /* based on include/net/ip.h */
@@ -46,6 +47,10 @@ static __always_inline int l3_br_fwd_fpm(struct xdp_md* ctx, struct tna_meta_t* 
 {
 	int rc;
 	struct bpf_fib_lookup fib_params = {0};
+
+	
+	//bpf_ipt_lookup(ctx, NULL, sizeof(struct bpf_ipt_lookup), 0);
+
 
 	fib_params.family	= AF_INET;
 	fib_params.tos		= tna_meta->iph->tos;
@@ -71,6 +76,16 @@ static __always_inline int l3_br_fwd_fpm(struct xdp_md* ctx, struct tna_meta_t* 
 
 		bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
 
+		//bpf_ipt_lookup tests
+		bpf_debug("Executing\n");
+		tna_meta->ipt_params.ifindex = fib_params.ifindex;
+		tna_meta->ipt_params.egress_ifindex = tna_meta->fdb_params.egress_ifindex;
+		bpf_ipt_lookup(ctx, &tna_meta->ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta->iph);
+
+		bpf_debug("verdict: %i\n", tna_meta->ipt_params.verdict);
+		if (tna_meta->ipt_params.verdict == 255)
+			return XDP_DROP;
+
 		if (tna_meta->fdb_params.egress_ifindex > 0)
 			return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
 		}
@@ -82,7 +97,7 @@ static __always_inline int l2_br_fwd_fpm(struct xdp_md* ctx)
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
     struct tna_meta_t tna_meta = {0};
-    tna_meta.fdb_params;
+    //tna_meta.fdb_params;
     tna_meta.eth = NULL;
     tna_meta.iph = NULL;
     tna_meta.vlh = NULL;

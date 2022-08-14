@@ -27,7 +27,7 @@ all: $(APP)
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) && rm $(VMLINUX)
 
 # create .output directory
 $(OUTPUT) $(OUTPUT)/libbpf $(dir $(BPFTOOL)): $(wildcard $(LIBBPF_SRC)/*.[ch] $(LIBBPF_SRC)/Makefile) 
@@ -53,3 +53,7 @@ $(XDP_APPS): $(patsubst %, %.bpf.c, $(APPS)) | $(OUTPUT) $(BPFTOOL) $(LIBBPF_OBJ
 # Build controller code
 $(APP): $(XDP_APPS)| $(OUTPUT) $(LIBBPF_OBJ) 
 	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -o $(BUILD_DIR)/$@
+
+# Generate vmlinux.h
+$(VMLINUX): $(APP)
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(VMLINUX)

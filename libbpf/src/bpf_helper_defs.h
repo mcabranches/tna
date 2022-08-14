@@ -4233,7 +4233,7 @@ static long (*bpf_get_func_arg_cnt)(void *ctx) = (void *) 185;
  * Returns
  * 	The syscall's return value.
  */
-static int (*bpf_get_retval)(void) = (void *) 186;
+//static int (*bpf_get_retval)(void) = (void *) 186;
 
 /*
  * bpf_set_retval
@@ -4245,7 +4245,7 @@ static int (*bpf_get_retval)(void) = (void *) 186;
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-static int (*bpf_set_retval)(int retval) = (void *) 187;
+//static int (*bpf_set_retval)(int retval) = (void *) 187;
 
 /*
  * bpf_xdp_get_buff_len
@@ -4360,3 +4360,6 @@ static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *) 194;
 
 //m-> added support to bpf_fdb_lookup
 static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen, unsigned char *src_mac, unsigned char *dst_mac) = (void *) 186;
+
+//m-> bpf_ipt_lookup
+static long (*bpf_ipt_lookup)(void *ctx, struct bpf_ipt_lookup *params, int plen, struct iphdr *iph) = (void *) 187;
