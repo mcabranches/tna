@@ -9,6 +9,7 @@
 #include <linux/if_link.h>
 #include "tnabr.h"
 #include "tnanl.h"
+#include "tnaipt.h"
 
 namespace tna {
 

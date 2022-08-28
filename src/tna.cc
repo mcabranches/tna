@@ -25,13 +25,21 @@ int main(void)
     Tnabr tnabr = Tnabr(XDP_FLAGS_SKB_MODE);
     create_tna_bridge(&tnabr, &tnanl);
 
+    //TNA Tnaipt opbject
+    Tnaipt tnaipt = Tnaipt();
+
     std::cout <<"Starting TNA controller ..." <<  std::endl;
 
     while(!stop) { //controller's main loop
-        //std::cout << "-----------------------" << std::endl;
-        //std::cout << "TNA main loop ..." << std::endl;
+        std::cout << "-----------------------" << std::endl;
+        std::cout << "TNA main loop ..." << std::endl;
         //this blocks and is awaken if an event happens
         process_tnanl_event(&tnabr, &tnanl);
+        //if (tnaipt.has_unsupported_rule())
+        //    cout << "Unsupported" << endl;
+
+        //tnaipt.refresh_tnaipt();
+        //sleep(1);
     }
 
     return 0;

@@ -13,7 +13,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's
 # Use our own libbpf API headers and Linux UAPI headers distributed with
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
-INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I../common -I/usr/include/libnl3 
+INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I../common -I ../common/iptables/include -I/usr/include/libnl3 
 CXXFLAGS := -g -Wall
 
 XDP_APPS = xdp_brfdb xdp_rtr xdp_mon
@@ -52,7 +52,7 @@ $(XDP_APPS): $(patsubst %, %.bpf.c, $(APPS)) | $(OUTPUT) $(BPFTOOL) $(LIBBPF_OBJ
 
 # Build controller code
 $(APP): $(XDP_APPS)| $(OUTPUT) $(LIBBPF_OBJ) 
-	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -o $(BUILD_DIR)/$@
+	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -fpermissive -w -o $(BUILD_DIR)/$@
 
 # Generate vmlinux.h
 $(VMLINUX): $(APP)
