@@ -56,11 +56,13 @@ class Tnaipt {
         void dump_ipt(void) 
         {
             _dump_ipt();
+            return;
         }
 
         void refresh_tnaipt(void)
         {
             _refresh_tnaipt();
+            return;
         }
 
         bool has_unsupported_rule()
@@ -71,20 +73,40 @@ class Tnaipt {
                 return false;
         }
 
-        void update_tnaipt(void)
+        void update_tnaipt_state(void)
         {
+            int event_type = 0;
+
             if (has_unsupported_rule() || (count_ipt_rules(tna_ipt) == 0)) {
                 install_ipt = false;
-                if (install_ipt != last_install_ipt)
-                    remove_tnaipt();
+                if (install_ipt != last_install_ipt) {
+                    event_type = 1;
+                }
                 last_install_ipt = false;
             }
             else if (count_ipt_rules(tna_ipt) > 0) {
                 install_ipt = true;
-                if (install_ipt != last_install_ipt)
-                    install_tnaipt();
+                if (install_ipt != last_install_ipt) {
+                    event_type = 2;
+                }
                 last_install_ipt = true;
             }
+            
+            if (event_type)
+                notify_ipt_state_change(event_type);
+            return;
+        }
+
+        void update_tnaipt(int event_type)
+        {
+            if (event_type == 1) {
+                remove_tnaipt();
+            }
+
+            else if (event_type == 2) {
+                install_tnaipt();
+            }
+            return;
         }
 
 
@@ -106,10 +128,11 @@ class Tnaipt {
         {
             Tnaipt *tnaipt = (Tnaipt *)args;
             while (true) {
-                tnaipt->update_tnaipt();
+                tnaipt->update_tnaipt_state();
                 tnaipt->refresh_tnaipt();
                 sleep(1);
             }
+            return;
         }
 
         void init_tna_ipt(void) 
@@ -173,6 +196,18 @@ class Tnaipt {
         void install_tnaipt(void)
         {
             cout << "Installing Tnaipt ..." << endl;
+        }
+
+        void notify_ipt_state_change(int event_type)
+        {
+            pthread_mutex_lock(&tna_g_ns::m1);
+
+            tna_g_ns::tna_event_type = event_type;
+
+            tna_g_ns::tna_event_flag = tna_g_ns::TNA_IPT_EVENT;
+            
+            pthread_cond_signal(&tna_g_ns::cv1);
+            pthread_mutex_unlock(&tna_g_ns::m1);
         }
         
         void _dump_ipt(void)

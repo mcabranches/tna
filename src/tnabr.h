@@ -176,7 +176,7 @@ class Tnabr {
 		int ret;
 		struct xdp_brfdb_bpf *skel;
 		int _ifindex;
-		int _flags = XDP_FLAGS_HW_MODE; /* default */
+		int _flags = XDP_FLAGS_SKB_MODE; /* default */
 		int map_fd;
 
 		int _destroy_tnabr(void)

@@ -42,6 +42,9 @@ namespace tna {
         if (tna_g_ns::tna_event_flag & tna_g_ns::TNA_BR_EVENT)
             tnanl->update_tna_bridge(tnabr, tna_g_ns::interface_g, tna_g_ns::tna_event_type);
 
+        else if ((tna_g_ns::tna_event_flag & tna_g_ns::TNA_IPT_EVENT))
+            tnaipt->update_tnaipt(tna_g_ns::tna_event_type);
+
         tna_g_ns::tna_event_type = 0;
         tna_g_ns::tna_event_flag = 0;
 

@@ -33,6 +33,7 @@ int main(void)
     while(!stop) { //controller's main loop
         std::cout << "-----------------------" << std::endl;
         std::cout << "TNA main loop ..." << std::endl;
+        std::cout << "-----------------------" << std::endl;
         //this blocks and is awaken if an event happens
         process_tna_event(&tnabr, &tnanl, &tnaipt);
     }
