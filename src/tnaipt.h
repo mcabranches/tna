@@ -1,22 +1,6 @@
 #ifndef IPT_QUERY_H
 #define IPT_QUERY_H
 
-#include <getopt.h>
-#include <sys/errno.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <string.h>
-#include <dlfcn.h>
-#include <time.h>
-#include <cstdlib>
-#include <unistd.h>
-#include <stdexcept>
-#include <iostream>
-#include <vector>
-#include <unordered_map>
-#include <memory>
-#include <libiptc/libiptc.h>
 #include "iptables.h"
 
 #define NUM_NF_HOOKS 5
@@ -24,7 +8,7 @@
 
 /* struct and flags definitions - should be moved to util.h in TNA */
 
-using namespace std;
+//using namespace std;
 
 /* TNA match flags definition */
 enum ipt_match_flags {
@@ -47,8 +31,6 @@ struct tna_ipt_rule {
 
 struct tna_ipt_chain {
     string name;
-    //unordered_map<string, struct ipt_entry*> ipt_entries;
-    //vector  <struct ipt_entry> ipt_entries;
     vector <struct tna_ipt_rule> ipt_rules;
 };
 
@@ -67,6 +49,8 @@ class Tnaipt {
         Tnaipt(void) 
         {
             init_tna_ipt();
+            install_ipt = last_install_ipt = false;
+            pthread_create(&t1_tnipt, NULL, tna_mon_ipt, this);
         }
 
         void dump_ipt(void) 
@@ -83,14 +67,29 @@ class Tnaipt {
         {
             if (_has_unsupported_rule())
                 return true;
-                //cout << "unsupported\n";
             else
                 return false;
         }
 
+        void update_tnaipt(void)
+        {
+            if (has_unsupported_rule() || (count_ipt_rules(tna_ipt) == 0)) {
+                install_ipt = false;
+                if (install_ipt != last_install_ipt)
+                    remove_tnaipt();
+                last_install_ipt = false;
+            }
+            else if (count_ipt_rules(tna_ipt) > 0) {
+                install_ipt = true;
+                if (install_ipt != last_install_ipt)
+                    install_tnaipt();
+                last_install_ipt = true;
+            }
+        }
+
+
     private:
 
-        //struct ipt_ip ipt_ip;
         const char *tablenames[NUM_IPT_TABLES] = {"nat", "filter", "mangle", "raw", "security"};
         /* We currently do not support: */
         const char *unsupported_tables[NUM_IPT_TABLES] = {"nat", "mangle", "raw", "security"};
@@ -98,6 +97,20 @@ class Tnaipt {
         
         struct tna_ipt tna_ipt;
         struct ipt_entry *e;
+        pthread_t t1_tnipt;
+        bool install_ipt;
+        bool last_install_ipt; //detect change in ipt state
+
+        //TO-DO: change logic to detect a supported iptables rule
+        static void *tna_mon_ipt(void *args)
+        {
+            Tnaipt *tnaipt = (Tnaipt *)args;
+            while (true) {
+                tnaipt->update_tnaipt();
+                tnaipt->refresh_tnaipt();
+                sleep(1);
+            }
+        }
 
         void init_tna_ipt(void) 
         {
@@ -151,8 +164,17 @@ class Tnaipt {
 
             return;
         }
-        
 
+        void remove_tnaipt(void) 
+        {
+            cout << "Removing Tnaipt ..." << endl;
+        }
+
+        void install_tnaipt(void)
+        {
+            cout << "Installing Tnaipt ..." << endl;
+        }
+        
         void _dump_ipt(void)
         {
             unordered_map<string, struct tna_ipt_chain>::iterator ipt_chain_it;
@@ -162,22 +184,26 @@ class Tnaipt {
                 cout << "Chains: " << endl;
                 for (ipt_chain_it = tna_ipt.ipt_tables[i].ipt_chains.begin(); ipt_chain_it != tna_ipt.ipt_tables[i].ipt_chains.end(); ++ipt_chain_it) {
                     cout << ipt_chain_it->second.name << endl;
-                    cout << "Number of ipt rules: " << count_ipt_rules(ipt_chain_it->second) << endl;                       
+                    cout << "Number of ipt rules: " << count_ipt_rules_chain(ipt_chain_it->second) << endl;                       
                 }
             }
         }
 
-        int count_ipt_rules(struct tna_ipt_chain ipt_chain) 
+        int count_ipt_rules(struct tna_ipt tna_ipt)
         {
-            return ipt_chain.ipt_rules.size();
+            unordered_map<string, struct tna_ipt_chain>::iterator ipt_chain_it;
+            int total = 0;
+            for (int i = 0; i < tna_ipt.ipt_tables.size(); i++) {
+                for (ipt_chain_it = tna_ipt.ipt_tables[i].ipt_chains.begin(); ipt_chain_it != tna_ipt.ipt_tables[i].ipt_chains.end(); ++ipt_chain_it) {
+                    total += count_ipt_rules_chain(ipt_chain_it->second);                       
+                }
+            }
+            return total;
         }
 
-        bool has_ipt_rules(struct tna_ipt_chain ipt_chain)
+        int count_ipt_rules_chain(struct tna_ipt_chain ipt_chain)
         {
-            if (count_ipt_rules(ipt_chain) > 0)
-                return true;
-            else
-                return false;
+            return ipt_chain.ipt_rules.size();
         }
 
         void populate_ipt_rule(struct tna_ipt_rule *ipt_rule)

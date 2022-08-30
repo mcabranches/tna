@@ -29,21 +29,23 @@ namespace tna {
         return 0;
     }
 
-    int process_tnanl_event(Tnabr *tnabr, Tnanl *tnanl)
+    int process_tna_event(Tnabr *tnabr, Tnanl *tnanl, Tnaipt *tnaipt)
     {
 
         //tna_interface ifs_entry = {0};
 
-        pthread_mutex_lock(&tnanl_g_ns::mnl1);
-        while (tnanl_g_ns::tnanl_event_type == 0) 
-            pthread_cond_wait(&tnanl_g_ns::cvnl1, &tnanl_g_ns::mnl1);
+        pthread_mutex_lock(&tna_g_ns::m1);
+        while (tna_g_ns::tna_event_type == 0) 
+            pthread_cond_wait(&tna_g_ns::cv1, &tna_g_ns::m1);
 
-        //tnanl->update_state_tna_bridge(tnabr, tnanl_g_ns::interface_g);
-        tnanl->update_tna_bridge(tnabr, tnanl_g_ns::interface_g, tnanl_g_ns::tnanl_event_type);
+        //tnanl->update_state_tna_bridge(tnabr, tna_g_ns::interface_g);
+        if (tna_g_ns::tna_event_flag & tna_g_ns::TNA_BR_EVENT)
+            tnanl->update_tna_bridge(tnabr, tna_g_ns::interface_g, tna_g_ns::tna_event_type);
 
-        tnanl_g_ns::tnanl_event_type = 0;   
+        tna_g_ns::tna_event_type = 0;
+        tna_g_ns::tna_event_flag = 0;
 
-        pthread_mutex_unlock(&tnanl_g_ns::mnl1);
+        pthread_mutex_unlock(&tna_g_ns::m1);
 
         return 0;
     }

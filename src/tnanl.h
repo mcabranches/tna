@@ -36,27 +36,6 @@
 
 #define MAX_INTERFACES 32
 
-
-namespace tnanl_g_ns {
-	//signal nl events
-    pthread_mutex_t mnl1 = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cvnl1 = PTHREAD_COND_INITIALIZER;
-    int tnanl_event_type = 0;
-
-    struct tna_interface interface_g = {0};
-
-    int clean_g_ns(void)
-    {
-        pthread_mutex_lock(&tnanl_g_ns::mnl1);
-        tnanl_event_type = 1;
-        pthread_cond_signal(&cvnl1);
-        pthread_mutex_unlock(&tnanl_g_ns::mnl1);
-
-        return 0;
-    }
-}
-
-
 class Tnanl {
 
     public:
@@ -72,8 +51,8 @@ class Tnanl {
        {
             close_nlr_q();
             drop_membership_nlr();
-            pthread_cond_destroy(&tnanl_g_ns::cvnl1);
-            pthread_mutex_destroy(&tnanl_g_ns::mnl1);
+            pthread_cond_destroy(&tna_g_ns::cv1);
+            pthread_mutex_destroy(&tna_g_ns::m1);
        }
 
         void dump_cached_interfaces(void)
@@ -423,14 +402,16 @@ class Tnanl {
                 event_type = 5;
             }
 
-            pthread_mutex_lock(&tnanl_g_ns::mnl1);
+            pthread_mutex_lock(&tna_g_ns::m1);
 
-            tnanl_g_ns::tnanl_event_type = event_type;
+            tna_g_ns::tna_event_type = event_type;
 
-            tnanl_g_ns::interface_g = ifs_entry;
+            tna_g_ns::tna_event_flag = tna_g_ns::TNA_BR_EVENT;
+
+            tna_g_ns::interface_g = ifs_entry;
             
-            pthread_cond_signal(&tnanl_g_ns::cvnl1);
-            pthread_mutex_unlock(&tnanl_g_ns::mnl1);
+            pthread_cond_signal(&tna_g_ns::cv1);
+            pthread_mutex_unlock(&tna_g_ns::m1);
             
             return 0;
         }
@@ -599,7 +580,6 @@ class Tnanl {
             nl_recvmsgs_default(sk);
 
             nla_put_failure:
-                cout << "Closing\n";
                 nlmsg_free(msg);
                 nl_socket_free(sk);
                 return;
