@@ -160,6 +160,7 @@ class Tnaipt {
                         populate_ipt_rule(&ipt_rule);
                         ipt_table.ipt_chains[chain].ipt_rules.push_back(ipt_rule);
                     }
+                    //free(ipt_table.h);
                 }
                 tna_ipt.ipt_tables.push_back(ipt_table);
             }
