@@ -52,6 +52,32 @@ struct tna_bridge {
 	unordered_map<string, struct tna_interface> brifs;
 };
 
+/* TNA global variables */
+namespace tna_g_ns {
+	//signal nl events
+    pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cv1 = PTHREAD_COND_INITIALIZER;
+    int tna_event_type = 0;
+	int tna_event_flag = 0;
+
+    struct tna_interface interface_g = {0};
+
+    int clean_g_ns(void)
+    {
+        pthread_mutex_lock(&tna_g_ns::m1);
+        tna_event_type = 1;
+        pthread_cond_signal(&cv1);
+        pthread_mutex_unlock(&tna_g_ns::m1);
+
+        return 0;
+    }
+
+	enum tna_event_flags {
+		TNA_BR_EVENT = 1 << 0,
+		TNA_IPT_EVENT = 1 << 1,
+	};
+}
+
 
 namespace util {
 

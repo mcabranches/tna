@@ -31196,7 +31196,8 @@ enum bpf_func_id {
 	BPF_FUNC_get_func_ret = 184,
 	BPF_FUNC_get_func_arg_cnt = 185,
 	BPF_FUNC_fdb_lookup = 186,
-	__BPF_FUNC_MAX_ID = 187,
+	BPF_FUNC_ipt_lookup = 187,
+	__BPF_FUNC_MAX_ID = 188,
 };
 
 struct bpf_func_info {
@@ -106332,6 +106333,46 @@ struct bpf_fdb_lookup {
 	__u16 flags;
 };
 
+struct bpf_ipt_lookup {
+	__u32 ifindex;
+	__u32 egress_ifindex;
+	__u16 flags;
+	__u8 verdict;
+};
+
+struct vlan_pcpu_stats {
+	u64 rx_packets;
+	u64 rx_bytes;
+	u64 rx_multicast;
+	u64 tx_packets;
+	u64 tx_bytes;
+	struct u64_stats_sync syncp;
+	u32 rx_errors;
+	u32 tx_dropped;
+};
+
+struct vlan_priority_tci_mapping {
+	u32 priority;
+	u16 vlan_qos;
+	struct vlan_priority_tci_mapping *next;
+};
+
+struct vlan_dev_priv {
+	unsigned int nr_ingress_mappings;
+	u32 ingress_priority_map[8];
+	unsigned int nr_egress_mappings;
+	struct vlan_priority_tci_mapping *egress_priority_map[16];
+	__be16 vlan_proto;
+	u16 vlan_id;
+	u16 flags;
+	struct net_device *real_dev;
+	netdevice_tracker dev_tracker;
+	unsigned char real_dev_addr[6];
+	struct proc_dir_entry *dent;
+	struct vlan_pcpu_stats *vlan_pcpu_stats;
+	struct netpoll *netpoll;
+};
+
 typedef int (*bpf_aux_classic_check_t)(struct sock_filter *, unsigned int);
 
 enum {
@@ -106775,6 +106816,8 @@ typedef u64 (*btf_bpf_xdp_fib_lookup)(struct xdp_buff *, struct bpf_fib_lookup *
 typedef u64 (*btf_bpf_skb_fib_lookup)(struct sk_buff *, struct bpf_fib_lookup *, int, u32);
 
 typedef u64 (*btf_bpf_fdb_lookup)(struct xdp_buff *, struct bpf_fdb_lookup *, int, unsigned char *, unsigned char *);
+
+typedef u64 (*btf_bpf_ipt_lookup)(struct xdp_buff *, struct bpf_ipt_lookup *, int, struct iphdr *);
 
 typedef u64 (*btf_bpf_skb_check_mtu)(struct sk_buff *, u32, u32 *, s32, u64);
 
@@ -111607,19 +111650,6 @@ enum {
 	__TCA_MAX = 16,
 };
 
-struct vlan_pcpu_stats {
-	u64 rx_packets;
-	u64 rx_bytes;
-	u64 rx_multicast;
-	u64 tx_packets;
-	u64 tx_bytes;
-	struct u64_stats_sync syncp;
-	u32 rx_errors;
-	u32 tx_dropped;
-};
-
-struct netpoll___2;
-
 struct skb_array {
 	struct ptr_ring ring;
 };
@@ -111640,7 +111670,7 @@ struct macvlan_dev {
 	u16 flags;
 	unsigned int macaddr_count;
 	u32 bc_queue_len_req;
-	struct netpoll___2 *netpoll;
+	struct netpoll *netpoll;
 };
 
 struct psched_ratecfg {
@@ -113685,6 +113715,294 @@ struct nf_sockopt_ops {
 	struct module *owner;
 };
 
+struct xt_action_param;
+
+struct xt_mtchk_param;
+
+struct xt_mtdtor_param;
+
+struct xt_match {
+	struct list_head list;
+	const char name[29];
+	u_int8_t revision;
+	bool (*match)(const struct sk_buff *, struct xt_action_param *);
+	int (*checkentry)(const struct xt_mtchk_param *);
+	void (*destroy)(const struct xt_mtdtor_param *);
+	void (*compat_from_user)(void *, const void *);
+	int (*compat_to_user)(void *, const void *);
+	struct module *me;
+	const char *table;
+	unsigned int matchsize;
+	unsigned int usersize;
+	unsigned int compatsize;
+	unsigned int hooks;
+	short unsigned int proto;
+	short unsigned int family;
+};
+
+struct xt_entry_match {
+	union {
+		struct {
+			__u16 match_size;
+			char name[29];
+			__u8 revision;
+		} user;
+		struct {
+			__u16 match_size;
+			struct xt_match *match;
+		} kernel;
+		__u16 match_size;
+	} u;
+	unsigned char data[0];
+};
+
+struct xt_tgchk_param;
+
+struct xt_tgdtor_param;
+
+struct xt_target {
+	struct list_head list;
+	const char name[29];
+	u_int8_t revision;
+	unsigned int (*target)(struct sk_buff *, const struct xt_action_param *);
+	int (*checkentry)(const struct xt_tgchk_param *);
+	void (*destroy)(const struct xt_tgdtor_param *);
+	void (*compat_from_user)(void *, const void *);
+	int (*compat_to_user)(void *, const void *);
+	struct module *me;
+	const char *table;
+	unsigned int targetsize;
+	unsigned int usersize;
+	unsigned int compatsize;
+	unsigned int hooks;
+	short unsigned int proto;
+	short unsigned int family;
+};
+
+struct xt_entry_target {
+	union {
+		struct {
+			__u16 target_size;
+			char name[29];
+			__u8 revision;
+		} user;
+		struct {
+			__u16 target_size;
+			struct xt_target *target;
+		} kernel;
+		__u16 target_size;
+	} u;
+	unsigned char data[0];
+};
+
+struct xt_standard_target {
+	struct xt_entry_target target;
+	int verdict;
+};
+
+struct xt_error_target {
+	struct xt_entry_target target;
+	char errorname[30];
+};
+
+struct xt_counters {
+	__u64 pcnt;
+	__u64 bcnt;
+};
+
+struct xt_counters_info {
+	char name[32];
+	unsigned int num_counters;
+	struct xt_counters counters[0];
+};
+
+struct xt_action_param {
+	union {
+		const struct xt_match *match;
+		const struct xt_target *target;
+	};
+	union {
+		const void *matchinfo;
+		const void *targinfo;
+	};
+	const struct nf_hook_state *state;
+	unsigned int thoff;
+	u16 fragoff;
+	bool hotdrop;
+};
+
+struct xt_mtchk_param {
+	struct net *net;
+	const char *table;
+	const void *entryinfo;
+	const struct xt_match *match;
+	void *matchinfo;
+	unsigned int hook_mask;
+	u_int8_t family;
+	bool nft_compat;
+};
+
+struct xt_mtdtor_param {
+	struct net *net;
+	const struct xt_match *match;
+	void *matchinfo;
+	u_int8_t family;
+};
+
+struct xt_tgchk_param {
+	struct net *net;
+	const char *table;
+	const void *entryinfo;
+	const struct xt_target *target;
+	void *targinfo;
+	unsigned int hook_mask;
+	u_int8_t family;
+	bool nft_compat;
+};
+
+struct xt_tgdtor_param {
+	struct net *net;
+	const struct xt_target *target;
+	void *targinfo;
+	u_int8_t family;
+};
+
+struct xt_table_info;
+
+struct xt_table {
+	struct list_head list;
+	unsigned int valid_hooks;
+	struct xt_table_info *private;
+	struct nf_hook_ops *ops;
+	struct module *me;
+	u_int8_t af;
+	int priority;
+	const char name[32];
+};
+
+struct xt_table_info {
+	unsigned int size;
+	unsigned int number;
+	unsigned int initial_entries;
+	unsigned int hook_entry[5];
+	unsigned int underflow[5];
+	unsigned int stacksize;
+	void ***jumpstack;
+	unsigned char entries[0];
+};
+
+struct xt_percpu_counter_alloc_state {
+	unsigned int off;
+	const char *mem;
+};
+
+struct compat_xt_entry_match {
+	union {
+		struct {
+			u_int16_t match_size;
+			char name[29];
+			u_int8_t revision;
+		} user;
+		struct {
+			u_int16_t match_size;
+			compat_uptr_t match;
+		} kernel;
+		u_int16_t match_size;
+	} u;
+	unsigned char data[0];
+};
+
+struct compat_xt_entry_target {
+	union {
+		struct {
+			u_int16_t target_size;
+			char name[29];
+			u_int8_t revision;
+		} user;
+		struct {
+			u_int16_t target_size;
+			compat_uptr_t target;
+		} kernel;
+		u_int16_t target_size;
+	} u;
+	unsigned char data[0];
+};
+
+struct compat_xt_counters {
+	compat_u64 pcnt;
+	compat_u64 bcnt;
+};
+
+struct compat_xt_counters_info {
+	char name[32];
+	compat_uint_t num_counters;
+	struct compat_xt_counters counters[0];
+} __attribute__((packed));
+
+struct xt_template {
+	struct list_head list;
+	int (*table_init)(struct net *);
+	struct module *me;
+	char name[32];
+};
+
+struct xt_pernet {
+	struct list_head tables[13];
+};
+
+struct compat_delta {
+	unsigned int offset;
+	int delta;
+};
+
+struct xt_af {
+	struct mutex mutex;
+	struct list_head match;
+	struct list_head target;
+	struct mutex compat_mutex;
+	struct compat_delta *compat_tab;
+	unsigned int number;
+	unsigned int cur;
+};
+
+struct compat_xt_standard_target {
+	struct compat_xt_entry_target t;
+	compat_uint_t verdict;
+};
+
+struct compat_xt_error_target {
+	struct compat_xt_entry_target t;
+	char errorname[30];
+};
+
+struct nf_mttg_trav {
+	struct list_head *head;
+	struct list_head *curr;
+	uint8_t class;
+};
+
+enum {
+	MTTG_TRAV_INIT = 0,
+	MTTG_TRAV_NFP_UNSPEC = 1,
+	MTTG_TRAV_NFP_SPEC = 2,
+	MTTG_TRAV_DONE = 3,
+};
+
+struct xt_tcp {
+	__u16 spts[2];
+	__u16 dpts[2];
+	__u8 option;
+	__u8 flg_mask;
+	__u8 flg_cmp;
+	__u8 invflags;
+};
+
+struct xt_udp {
+	__u16 spts[2];
+	__u16 dpts[2];
+	__u8 invflags;
+};
+
 struct ip_mreqn {
 	struct in_addr imr_multiaddr;
 	struct in_addr imr_address;
@@ -115530,6 +115848,112 @@ struct rta_mfc_stats {
 	__u64 mfcs_bytes;
 	__u64 mfcs_wrong_if;
 };
+
+struct xt_get_revision {
+	char name[29];
+	__u8 revision;
+};
+
+struct ipt_ip {
+	struct in_addr src;
+	struct in_addr dst;
+	struct in_addr smsk;
+	struct in_addr dmsk;
+	char iniface[16];
+	char outiface[16];
+	unsigned char iniface_mask[16];
+	unsigned char outiface_mask[16];
+	__u16 proto;
+	__u8 flags;
+	__u8 invflags;
+};
+
+struct ipt_entry {
+	struct ipt_ip ip;
+	unsigned int nfcache;
+	__u16 target_offset;
+	__u16 next_offset;
+	unsigned int comefrom;
+	struct xt_counters counters;
+	unsigned char elems[0];
+};
+
+struct ipt_icmp {
+	__u8 type;
+	__u8 code[2];
+	__u8 invflags;
+};
+
+struct ipt_getinfo {
+	char name[32];
+	unsigned int valid_hooks;
+	unsigned int hook_entry[5];
+	unsigned int underflow[5];
+	unsigned int num_entries;
+	unsigned int size;
+};
+
+struct ipt_replace {
+	char name[32];
+	unsigned int valid_hooks;
+	unsigned int num_entries;
+	unsigned int size;
+	unsigned int hook_entry[5];
+	unsigned int underflow[5];
+	unsigned int num_counters;
+	struct xt_counters *counters;
+	struct ipt_entry entries[0];
+};
+
+struct ipt_get_entries {
+	char name[32];
+	unsigned int size;
+	struct ipt_entry entrytable[0];
+};
+
+struct ipt_standard {
+	struct ipt_entry entry;
+	struct xt_standard_target target;
+};
+
+struct ipt_error {
+	struct ipt_entry entry;
+	struct xt_error_target target;
+};
+
+struct compat_ipt_entry {
+	struct ipt_ip ip;
+	compat_uint_t nfcache;
+	__u16 target_offset;
+	__u16 next_offset;
+	compat_uint_t comefrom;
+	struct compat_xt_counters counters;
+	unsigned char elems[0];
+};
+
+enum nf_ip_trace_comments {
+	NF_IP_TRACE_COMMENT_RULE = 0,
+	NF_IP_TRACE_COMMENT_RETURN = 1,
+	NF_IP_TRACE_COMMENT_POLICY = 2,
+};
+
+struct compat_ipt_replace {
+	char name[32];
+	u32 valid_hooks;
+	u32 num_entries;
+	u32 size;
+	u32 hook_entry[5];
+	u32 underflow[5];
+	u32 num_counters;
+	compat_uptr_t counters;
+	struct compat_ipt_entry entries[0];
+} __attribute__((packed));
+
+struct compat_ipt_get_entries {
+	char name[32];
+	compat_uint_t size;
+	struct compat_ipt_entry entrytable[0];
+} __attribute__((packed));
 
 struct bictcp {
 	u32 cnt;
@@ -117566,28 +117990,6 @@ enum vlan_flags {
 	VLAN_FLAG_LOOSE_BINDING = 4,
 	VLAN_FLAG_MVRP = 8,
 	VLAN_FLAG_BRIDGE_BINDING = 16,
-};
-
-struct vlan_priority_tci_mapping {
-	u32 priority;
-	u16 vlan_qos;
-	struct vlan_priority_tci_mapping *next;
-};
-
-struct vlan_dev_priv {
-	unsigned int nr_ingress_mappings;
-	u32 ingress_priority_map[8];
-	unsigned int nr_egress_mappings;
-	struct vlan_priority_tci_mapping *egress_priority_map[16];
-	__be16 vlan_proto;
-	u16 vlan_id;
-	u16 flags;
-	struct net_device *real_dev;
-	netdevice_tracker dev_tracker;
-	unsigned char real_dev_addr[6];
-	struct proc_dir_entry *dent;
-	struct vlan_pcpu_stats *vlan_pcpu_stats;
-	struct netpoll *netpoll;
 };
 
 enum vlan_protos {
