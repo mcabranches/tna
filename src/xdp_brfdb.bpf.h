@@ -86,10 +86,12 @@ static __always_inline int l3_br_fwd_fpm(struct xdp_md* ctx, struct tna_meta_t* 
 		if (tna_meta->ipt_params.verdict == 255)
 			return XDP_DROP;
 
-		if (tna_meta->fdb_params.egress_ifindex > 0)
+		if (tna_meta->fdb_params.egress_ifindex > 0) {
+			bpf_debug("ifindex: %i", tna_meta->fdb_params.egress_ifindex);
 			return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
 		}
-	return 0;
+	}
+	return XDP_PASS;
 }
 
 static __always_inline int l2_br_fwd_fpm(struct xdp_md* ctx)
@@ -142,7 +144,7 @@ static __always_inline int l2_br_fwd_fpm(struct xdp_md* ctx)
 
 	//This should only be deployed if bridge vlan interfaces have IP addresses configured on them
 	if (tna_meta.fdb_params.flags == 3 && nh_type == bpf_htons(ETH_P_IP)) {
-		//bpf_debug("Needs routing\n");
+		bpf_debug("Needs routing\n");
 		tna_meta.iph = nh.pos;
 
 		if (tna_meta.iph + 1 > data_end)

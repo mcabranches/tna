@@ -36,32 +36,12 @@
 
 #define MAX_INTERFACES 32
 
-
-namespace tnanl_g_ns {
-	//signal nl events
-    pthread_mutex_t mnl1 = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cvnl1 = PTHREAD_COND_INITIALIZER;
-    int tnanl_event_type = 0;
-
-    struct tna_interface interface_g = {0};
-
-    int clean_g_ns(void)
-    {
-        pthread_mutex_lock(&tnanl_g_ns::mnl1);
-        tnanl_event_type = 1;
-        pthread_cond_signal(&cvnl1);
-        pthread_mutex_unlock(&tnanl_g_ns::mnl1);
-
-        return 0;
-    }
-}
-
-
 class Tnanl {
 
     public:
         Tnanl(void) 
         {
+            cout << "Initializing tnanl" << endl;
             connect_nlr_q();
             build_link_nl_cache();
             add_membership_nlr();
@@ -72,8 +52,8 @@ class Tnanl {
        {
             close_nlr_q();
             drop_membership_nlr();
-            pthread_cond_destroy(&tnanl_g_ns::cvnl1);
-            pthread_mutex_destroy(&tnanl_g_ns::mnl1);
+            pthread_cond_destroy(&tna_g_ns::cv1);
+            pthread_mutex_destroy(&tna_g_ns::m1);
        }
 
         void dump_cached_interfaces(void)
@@ -115,6 +95,9 @@ class Tnanl {
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
                          if (interfaces[i].master_index == master_index) {
+                            interfaces[i].xdp_set = 0;
+                            if (interfaces[i].type == "Null")
+                                interfaces[i].type = "phys";
                             tnabr->add_if_tna_bridge(tnabridge, interfaces[i]);
                          }
                     }
@@ -131,154 +114,82 @@ class Tnanl {
             unordered_map<int, struct tna_vlan>::iterator vlan_it;
 
             struct tna_bridge tnabridge;
-            char *br_name;
+            char *br_name = NULL;
+            int xdp_set;
+
+            br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);
 
             if (interface.type == "bridge") {
                 tnabridge.brname = interface.ifname;
-                tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
+                tnabridge.op_state = interface.op_state;
+                tnabridge.op_state_str = interface.op_state_str;
+
+                if (!(tnabr->tnabrs.find(tnabridge.brname) == tnabr->tnabrs.end())) {
+                    cout << "bridge exists updating state ..." << endl;
+                    if_indextoname(interface.ifindex, br_name);
+                    tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
+                    tnabridge.op_state = interface.op_state;
+                    tnabridge.op_state_str = interface.op_state_str;
+                }
+                else {
+                    tnabr->add_tna_bridge(tnabridge);
+                }
             }
-            else {
-                br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);
+
+            else if (interface.type == "phys") {
                 if_indextoname(interface.master_index, br_name);
-
-                tnabr->tnabrs[br_name].brifs[interface.ifname].op_state_str = interface.op_state_str;;
+                if (!(tnabr->tnabrs[br_name].brifs.find(interface.ifname) == tnabr->tnabrs[br_name].brifs.end())) {
+                    cout << "Interface exists on bridge " << br_name << " updating state ..." << endl;
+                    xdp_set = tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set;
+                    tnabr->tnabrs[br_name].brifs[interface.ifname] = interface;
+                    tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set = xdp_set;
+                }
+                else if (interface.master_index > 1) {
+                    tnabr->add_if_tna_bridge(tnabridge, interface);
+                }
             }
-
-            //cout << "\n\nEVENT_TYPE: " << event_type << endl;
-            //cout << "n_ifname: " << interface.ifname << endl;
-            //cout << "ifindex: " << interface.ifindex << endl;
-            //cout << "master_index: " << interface.master_index << endl;
-            //cout << "n_type: " << interface.type << endl;
-            //cout << "n_opstate: " << interface.op_state_str << endl << endl;
 
             if (event_type == 1) {
+                if (interface.type == "phys") {
 
-                if (interface.type == "bridge") {
-                    tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
-                    tnabridge.brname = interface.ifname;
-
-                    if (tnabr->tnabrs[interface.ifname].brname == interface.ifname) {
-
-                        if (interface.op_state_str == "up") {
-
-                            for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
-                                if (if_it->second.op_state_str == "up")
-					                tnabr->install_xdp_tnabr(if_it->second);
-				            }
-
-                        }
-
+                    if (interface.op_state_str == "down") {
+                        tnabr->uninstall_xdp_tnabr(&tnabr->tnabrs[br_name].brifs[interface.ifname]);
                     }
-                    else {
-                        tnabr->add_tna_bridge(tnabridge);
-                    }
-
-                    if (interface.op_state_str == "up") {
-                        tnabr->accel_tna_bridge(tnabridge);
-                    }
-
+                    else if (interface.op_state_str == "up") {
+                        if (tnabr->tnabrs[br_name].op_state_str == "up")
+                            tnabr->install_xdp_tnabr(&tnabr->tnabrs[br_name].brifs[interface.ifname]);
+                    }   
                 }
-                if (interface.type == "Null") {
-                    if (interface.master_index != 0) {
-                        int ifs_exists = 0;
-                        char *br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);;
-                        if_indextoname(interface.master_index, br_name);
+                else if (interface.type == "bridge") {
 
-                        for (if_it = tnabr->tnabrs[br_name].brifs.begin(); if_it != tnabr->tnabrs[br_name].brifs.end(); ++if_it) {
-                                if (if_it->second.ifindex == interface.ifindex) {
-                                    ifs_exists = 1;
-                                    if (interface.op_state_str == "down")
-                                        tnabr->uninstall_xdp_tnabr(interface);        
+                    for (if_it = tnabr->tnabrs[br_name].brifs.begin(); if_it != tnabr->tnabrs[br_name].brifs.end(); ++if_it) {
 
-                                    break;
-                                }
-				        }
-                        if (ifs_exists == 0) {
-                            if (br_name) {
-                                tnabridge.brname = br_name;
-                                tnabr->add_if_tna_bridge(tnabridge, interface);
-                                
-                                if (tnabr->tnabrs[br_name].op_state_str == "up")
-                                    tnabr->install_xdp_tnabr(interface);
-                            }
-                        }
-
-                    }
-
+                        if (interface.op_state_str == "down")
+                            tnabr->uninstall_xdp_tnabr(&if_it->second);
+                        else if (interface.op_state_str == "up")
+                            tnabr->install_xdp_tnabr(&if_it->second);
+                    }       
                 }
-
             }
+
             if (event_type == 2) {
-                if (interface.type == "bridge") {
-
-                }
-
-                if (interface.type == "Null") {
+                if (interface.type == "phys") {
                     if (interface.master_index != 0) {
-                        tnabridge.brname = br_name;
-                        tnabr->remove_if_tna_bridge(tnabridge, interface);
-                    }
-
-                }
-
-            }
-            if (event_type == 3) {
-                if (interface.op_state_str == "down") {
-                    for (if_it = tnabr->tnabrs[interface.ifname].brifs.begin(); if_it != tnabr->tnabrs[interface.ifname].brifs.end(); ++if_it) {
-					    tnabr->uninstall_xdp_tnabr(if_it->second);
-				    }
-                }
-            }
-            if (event_type == 4) {
-                tnabr->install_xdp_tnabr(interface);
-            }
-
-            if (event_type == 5) {
-
-                /* Update vlan state */
-                tnabr->tnabrs[br_name].brifs[interface.ifname].vlans = interface.vlans;
-
-                /* Verify vlans and tagging on deployed bridges -- this will custmize the deployed XDP code */
-                for (br_it = tnabr->tnabrs.begin(); br_it != tnabr->tnabrs.end(); ++br_it) {
-                    br_it->second.has_vlan = 0;
-                    br_it->second.has_untagged_vlan = 0;
-
-                    for (if_it = br_it->second.brifs.begin(); if_it != br_it->second.brifs.end(); ++if_it) {
-                    
-                        for (vlan_it = if_it->second.vlans.begin(); vlan_it != if_it->second.vlans.end(); ++vlan_it) {
-                        
-                            if (vlan_it->second.vid > 1) {
-                                br_it->second.has_vlan |= 1;
-                                if (vlan_it->second.is_untagged_vlan == 1) {
-                                    br_it->second.has_untagged_vlan |= 1;
-                                }
-                                else {
-                                    br_it->second.has_untagged_vlan |= 0;
-                                }
-
-                            }
-                            else {
-                                br_it->second.has_vlan |= 0;
-                                br_it->second.has_untagged_vlan |= 0;
-                            }
-
-                        }
-                    }
-
-                    if (br_it->second.brname != "") {
-                        if (br_it->second.has_vlan) {
-                            cout << "Detected VLAN on BR: " << br_it->second.brname << endl;
-                            if (br_it->second.has_untagged_vlan) {
-                                cout << "Detected untagged VLAN on BR: " << br_it->second.brname << endl;
-                            }
-                        }
-                        else {
-                            cout << "No VLANs were detected on BR " << br_it->second.brname << endl;
-                        }
-
+                        tnabr->remove_if_tna_bridge(tnabr->tnabrs[br_name], &tnabr->tnabrs[br_name].brifs[interface.ifname]);
                     }
                 }
             }
+
+            /* DEBUG */
+            /*cout << "\n\nEVENT_TYPE: " << event_type << endl;
+            cout << "n_ifname: " << interface.ifname << endl;
+            cout << "ifindex: " << interface.ifindex << endl;
+            cout << "master_index: " << interface.master_index << endl;
+            cout << "n_type: " << interface.type << endl;
+            cout << "n_opstate: " << interface.op_state_str << endl << endl;
+            cout << "xdp_set: " << tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set << endl;*/
+            //cout << "Event type: " << event_type << endl;
+            //cout << "num ifs " << tnabr->tnabrs.size() << endl;
         }
 
 
@@ -290,7 +201,7 @@ class Tnanl {
        
         int connect_nlr_q(void) 
         {
-            cout << "Connecting to NETLINK_ROUTE socket ..." << endl; 
+            //cout << "Connecting to NETLINK_ROUTE socket ..." << endl; 
 
             nlr_q_sk = nl_socket_alloc();
             nl_connect(nlr_q_sk, NETLINK_ROUTE);
@@ -300,7 +211,7 @@ class Tnanl {
 
         int close_nlr_q(void)
         {
-            cout << "Closing NETLINK_ROUTE socket" << endl;
+            //cout << "Closing NETLINK_ROUTE socket" << endl;
 
             nl_socket_free(nlr_q_sk);
 
@@ -378,14 +289,28 @@ class Tnanl {
                 }
             }
 
+            if (ifs_entry.type == "Null")
+                ifs_entry.type = "phys";
+
+            if (ifs_entry.ifindex == ifs_entry.master_index)
+                ifs_entry.type = "bridge";
+
+            if (if_info->ifi_flags & if_info->ifi_change) {
+                if (if_info->ifi_flags & IFF_UP)
+                    ifs_entry.op_state_str = "up";
+                else
+                    ifs_entry.op_state_str = "down";
+            }
+
+
             //if (attrs[IFLA_AF_SPEC]) {
             //    ifs_entry.xdp_set = 1;
             //}
 
-            //cout << "family: " << if_info->ifi_family << endl;
-            //cout << "type: " << if_info->ifi_type << endl;
-            //cout << "\nifi_change: " << if_info->ifi_change << endl;
-            //cout << "ifi_flags " << if_info->ifi_flags << endl;
+            /*cout << "family: " << if_info->ifi_family << endl;
+            cout << "type: " << if_info->ifi_type << endl;
+            cout << "\nifi_change: " << if_info->ifi_change << endl;
+            cout << "ifi_flags " << if_info->ifi_flags << endl;*/
 
             //cout << "MSG_TYPE: " << (int) nlh->nlmsg_type << endl;
             //cout << "ifname: " << ifs_entry.ifname << endl;
@@ -393,51 +318,29 @@ class Tnanl {
             //cout << "has_untagged_vlan: " << ifs_entry.cur_vlan.is_untagged_vlan << endl;
             
 
-            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 0)) {
+            if ((int) nlh->nlmsg_type == RTM_NEWLINK)
                 event_type = 1;
-            }
             
-            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "Null") && (if_info->ifi_change > 0)) {
-                if ((if_info->ifi_flags & IFF_UP) && if_info->ifi_change != 256 ) {
-                        event_type = 4;
-                }
-                else {
-                    event_type = 1;
-                }
-            }
-
-            if ((int) nlh->nlmsg_type == RTM_DELLINK) {
+            if ((int) nlh->nlmsg_type == RTM_DELLINK)
                 event_type = 2;
-            }
 
-            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "bridge") && (if_info->ifi_change == 1)) {
-                if (!(if_info->ifi_flags & IFF_UP)) {
-                    event_type = 3;
-                }
-            }
-            /* event type 5 -> update vlan state */
-            //else
-            //    event_type = 5; 
+            pthread_mutex_lock(&tna_g_ns::m1);
 
-            if (((int) nlh->nlmsg_type == RTM_NEWLINK) && (ifs_entry.type == "Null") && (if_info->ifi_change == 0)) {
-                event_type = 5;
-            }
+            tna_g_ns::tna_event_type = event_type;
 
-            pthread_mutex_lock(&tnanl_g_ns::mnl1);
+            tna_g_ns::tna_event_flag = tna_g_ns::TNA_BR_EVENT;
 
-            tnanl_g_ns::tnanl_event_type = event_type;
-
-            tnanl_g_ns::interface_g = ifs_entry;
+            tna_g_ns::interface_g = ifs_entry;
             
-            pthread_cond_signal(&tnanl_g_ns::cvnl1);
-            pthread_mutex_unlock(&tnanl_g_ns::mnl1);
+            pthread_cond_signal(&tna_g_ns::cv1);
+            pthread_mutex_unlock(&tna_g_ns::m1);
             
             return 0;
         }
 
         int add_membership_nlr(void)
         {
-            cout << "Adding NETLINK_ROUTE multicast membership" << endl;
+            //cout << "Adding NETLINK_ROUTE multicast membership" << endl;
             
             nlr_g_sk = nl_socket_alloc();
             nl_socket_disable_seq_check(nlr_g_sk);
@@ -450,7 +353,7 @@ class Tnanl {
 
         int drop_membership_nlr(void)
         {
-            cout << "Dropping NETLINK_ROUTE multicast membership" << endl;
+            //cout << "Dropping NETLINK_ROUTE multicast membership" << endl;
 
             nl_socket_drop_memberships(nlr_g_sk, RTNLGRP_LINK, 0);
             nl_socket_free(nlr_g_sk);
@@ -460,10 +363,10 @@ class Tnanl {
 
         int build_link_nl_cache(void)
         {
-            cout << "\nBuilding rtnl_cache ..." << endl;
+            //cout << "\nBuilding rtnl_cache ..." << endl;
 
             if (rtnl_link_alloc_cache(nlr_q_sk, AF_UNSPEC, &link_nl_cache) < 0)
-                cout << "Error building link rtnl_cache ..." << endl;
+                //cout << "Error building link rtnl_cache ..." << endl;
 
             return 0;
         }
@@ -540,13 +443,13 @@ class Tnanl {
                             struct bridge_vlan_info *vinfo;
                             vinfo = (struct bridge_vlan_info *) nla_data(af_attr);
                             if (vinfo->vid > 1) {
-                                cout << "Detected VLAN on BR: " << ifs_entry->master_index << endl;
+                                //cout << "Detected VLAN on BR: " << ifs_entry->master_index << endl;
                                 /* build a list of active VLANs on an interface */
                                 ifs_entry->vlans[vinfo->vid].vid = vinfo->vid;
                                 
                                 if (vinfo->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
                                     ifs_entry->vlans[vinfo->vid].is_untagged_vlan = 1;
-                                    cout << "Detected untagged VLAN on BR: " << ifs_entry->master_index << endl;
+                                    //cout << "Detected untagged VLAN on BR: " << ifs_entry->master_index << endl;
                                 }
                                 else {
                                     ifs_entry->vlans[vinfo->vid].is_untagged_vlan = 0;
@@ -599,7 +502,6 @@ class Tnanl {
             nl_recvmsgs_default(sk);
 
             nla_put_failure:
-                cout << "Closing\n";
                 nlmsg_free(msg);
                 nl_socket_free(sk);
                 return;
