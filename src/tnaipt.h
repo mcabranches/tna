@@ -5,6 +5,7 @@
 
 #define NUM_NF_HOOKS 5
 #define NUM_IPT_TABLES 5
+#define NUM_UNSUPPORTED_CHAINS 2
 
 /* struct and flags definitions - should be moved to util.h in TNA */
 
@@ -23,7 +24,8 @@ enum ipt_match_flags {
 
 struct tna_ipt_rule {
     struct ipt_entry *e;
-    string target;
+    string ipt_chain;
+    string ipt_table;
     string match_type;
     int match_flags;
     bool tna_supported;
@@ -77,19 +79,19 @@ class Tnaipt {
         {
             int event_type = 0;
 
-            if (has_unsupported_rule() || (count_ipt_rules(tna_ipt) == 0)) {
+            if (has_unsupported_rule() || (count_ipt_rules() == 0)) {
                 install_ipt = false;
                 if (install_ipt != last_install_ipt) {
                     event_type = 1;
+                    last_install_ipt = false;
                 }
-                last_install_ipt = false;
             }
-            else if (count_ipt_rules(tna_ipt) > 0) {
+            else if (count_ipt_rules() > 0) {
                 install_ipt = true;
                 if (install_ipt != last_install_ipt) {
                     event_type = 2;
+                    last_install_ipt = true;
                 }
-                last_install_ipt = true;
             }
             
             if (event_type)
@@ -114,8 +116,8 @@ class Tnaipt {
 
         const char *tablenames[NUM_IPT_TABLES] = {"nat", "filter", "mangle", "raw", "security"};
         /* We currently do not support: */
-        const char *unsupported_tables[NUM_IPT_TABLES] = {"nat", "mangle", "raw", "security"};
-        //const char *unsupported_chains[NUM_NF_HOOKS] = {"...", }
+        //const char *unsupported_tables[NUM_IPT_TABLES] = {"nat", "mangle", "raw", "security"};
+        string unsupported_chains[NUM_UNSUPPORTED_CHAINS] = {"INPUT", "OUTPUT"};
         
         struct tna_ipt tna_ipt;
         struct ipt_entry *e;
@@ -128,8 +130,8 @@ class Tnaipt {
         {
             Tnaipt *tnaipt = (Tnaipt *)args;
             while (true) {
-                tnaipt->update_tnaipt_state();
                 tnaipt->refresh_tnaipt();
+                tnaipt->update_tnaipt_state();
                 sleep(1);
             }
             return;
@@ -139,20 +141,21 @@ class Tnaipt {
         {
             cout << "Initializing tnaipt" << endl;
             const char *chain = NULL;
+            struct xtc_handle *h;
             for(int i = 0; i < NUM_IPT_TABLES; i++) {
                 struct tna_ipt_table ipt_table;
                 ipt_table.name = tablenames[i];
-                ipt_table.h = iptc_init(tablenames[i]);
-                if (!ipt_table.h) {
+                h = iptc_init(tablenames[i]);
+                if (!h) {
                     throw runtime_error("Are you root?\n");
                 }
 
-                for(chain = iptc_first_chain(ipt_table.h); chain; chain = iptc_next_chain(ipt_table.h)) {
+                for(chain = iptc_first_chain(h); chain; chain = iptc_next_chain(h)) {
                     struct tna_ipt_chain ipt_chain;
                     ipt_table.ipt_chains[chain] = ipt_chain;
                     ipt_table.ipt_chains[chain].name = chain;
 
-                    for (e = iptc_first_rule(chain, ipt_table.h); e; e = iptc_next_rule(e, ipt_table.h)) {
+                    for (e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h)) {
                         //struct ipt_entry e;
                         struct tna_ipt_rule ipt_rule;
                         ipt_rule.e = e;
@@ -160,8 +163,8 @@ class Tnaipt {
                         populate_ipt_rule(&ipt_rule);
                         ipt_table.ipt_chains[chain].ipt_rules.push_back(ipt_rule);
                     }
-                    //free(ipt_table.h);
                 }
+                iptc_free(h);
                 tna_ipt.ipt_tables.push_back(ipt_table);
             }
         }
@@ -169,20 +172,27 @@ class Tnaipt {
         void _refresh_tnaipt(void)
         {
             unordered_map<string, struct tna_ipt_chain>::iterator ipt_chain_it;
+            struct xtc_handle *h;
 
             for (int i = 0; i < tna_ipt.ipt_tables.size(); i++) {
             
                 for (ipt_chain_it = tna_ipt.ipt_tables[i].ipt_chains.begin(); ipt_chain_it != tna_ipt.ipt_tables[i].ipt_chains.end(); ++ipt_chain_it) {
-                    tna_ipt.ipt_tables[i].h = iptc_init(tna_ipt.ipt_tables[i].name.c_str());
+                    h = iptc_init(tna_ipt.ipt_tables[i].name.c_str());
                     ipt_chain_it->second.ipt_rules.clear();
-                    
-                    for (e = iptc_first_rule(ipt_chain_it->first.c_str(), tna_ipt.ipt_tables[i].h); e; e = iptc_next_rule(e, tna_ipt.ipt_tables[i].h)) {
+                    if (!(h)) {
+                        cout << "Cannot update tnaipt\n";
+                        break;
+                    }
+                    for (e = iptc_first_rule(ipt_chain_it->first.c_str(), h); e; e = iptc_next_rule(e, h)) {
                         struct tna_ipt_rule ipt_rule;
                         ipt_rule.e = e;
+                        ipt_rule.ipt_chain = ipt_chain_it->first.c_str();
+                        ipt_rule.ipt_table = tna_ipt.ipt_tables[i].name.c_str();
                         ipt_rule.tna_supported = false;
                         populate_ipt_rule(&ipt_rule);
                         tna_ipt.ipt_tables[i].ipt_chains[ipt_chain_it->first.c_str()].ipt_rules.push_back(ipt_rule);
                     }
+                    iptc_free(h);
                 }
             }
 
@@ -220,12 +230,13 @@ class Tnaipt {
                 cout << "Chains: " << endl;
                 for (ipt_chain_it = tna_ipt.ipt_tables[i].ipt_chains.begin(); ipt_chain_it != tna_ipt.ipt_tables[i].ipt_chains.end(); ++ipt_chain_it) {
                     cout << ipt_chain_it->second.name << endl;
-                    cout << "Number of ipt rules: " << count_ipt_rules_chain(ipt_chain_it->second) << endl;                       
+                    cout << "Number of ipt rules: " << count_ipt_rules_chain(ipt_chain_it->second) << endl;                                             
                 }
             }
         }
 
-        int count_ipt_rules(struct tna_ipt tna_ipt)
+        //int count_ipt_rules(struct tna_ipt tna_ipt)
+        int count_ipt_rules(void)
         {
             unordered_map<string, struct tna_ipt_chain>::iterator ipt_chain_it;
             int total = 0;
@@ -244,7 +255,7 @@ class Tnaipt {
 
         void populate_ipt_rule(struct tna_ipt_rule *ipt_rule)
         {
-            if (check_tna_rule_support(ipt_rule->e))
+            if (check_tna_rule_support(ipt_rule))
                 ipt_rule->tna_supported = true;
             
             return;
@@ -283,20 +294,25 @@ class Tnaipt {
             return 0;
         }
 
-        bool check_tna_rule_support(struct ipt_entry *e)
+        //bool check_tna_rule_support(struct ipt_entry *e)
+        bool check_tna_rule_support(struct tna_ipt_rule *tna_ipt_rule)
         {
             //checks if rule is currently supported by TNA
             //can use iptc_builtin to verify the presence of a non-builtin rule.
             bool supported = true;
 
-            if (get_match_flags(e) & M_UNSUPPORTED_MATCH_FLAGS)
+            if (get_match_flags(tna_ipt_rule->e) & M_UNSUPPORTED_MATCH_FLAGS)
                 supported = false;
+
+            for (int i = 0; i < NUM_UNSUPPORTED_CHAINS; i++) {
+                if (strcmp(tna_ipt_rule->ipt_chain.c_str(), unsupported_chains[i].c_str()) == 0) {
+                    supported = false;
+                }
+            }
             
             return supported;
         }
 
-        //TO-DO: add logic to detect unsupported rule on given a chain
-        //TO-DO: add logic to detect the reason why a rule is unsupported (e.g., unsupported match, table or chain)  
         bool _has_unsupported_rule(void)
         {
             bool unsupported = false;
@@ -306,10 +322,12 @@ class Tnaipt {
 
                 for (ipt_chain_it = tna_ipt.ipt_tables[i].ipt_chains.begin(); ipt_chain_it != tna_ipt.ipt_tables[i].ipt_chains.end(); ++ipt_chain_it) {
 
-                    for(int j = 0; j < ipt_chain_it->second.ipt_rules.size(); j++) {
+                    for (int j = 0; j < ipt_chain_it->second.ipt_rules.size(); j++) {
 
-                        if (!ipt_chain_it->second.ipt_rules[j].tna_supported)
+                        if (!ipt_chain_it->second.ipt_rules[j].tna_supported) {
                             unsupported = true;
+                            break;
+                        }
                     }
                 }
             }
