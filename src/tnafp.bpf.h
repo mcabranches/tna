@@ -25,9 +25,10 @@
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PROG_ARRAY);
-	__uint(max_entries, 1);
-	__uint(key_size, sizeof(__u32));
-	__array(values, int (void *));
+	__uint(max_entries, 20);
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(int));
+	//__array(values, int (void *));
 } jmp_table SEC(".maps");
 
 

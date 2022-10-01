@@ -54,6 +54,22 @@ class Tnafpd {
 				return 0;
 		}
 
+		int load_bpf_fpm(void) 
+		{
+			if (bpf_prog_load_xattr(&fpm_prog_load_attr, &fpm_bpf_obj, &fpm_fd))
+				throw std::runtime_error("load_xdp_program: cannot load object file");
+			
+			if (fpm_fd < 1)
+				throw std::runtime_error("load_xdp_program: invalid program fd");
+
+			fpm_dev_map = bpf_object__find_map_by_name(fpm_bpf_obj, "tx_port");
+
+			fpm_dev_map_fd = bpf_map__fd(fpm_dev_map);
+
+			return 0;
+
+		}
+
 		int destroy_tnafp(void) 
 		{
 			_destroy_tnafp();
@@ -63,11 +79,29 @@ class Tnafpd {
 		int deploy_tnafp(struct Tnaodb *tnaodb)
 		{
 			unordered_map<string, struct tna_interface>::iterator it;
+			int idx;
+			load_bpf_fpm();
+			deploy_tnafpm();
 
 			for (it = tnaodb->tnaifs.begin(); it != tnaodb->tnaifs.end(); ++it) {
-				if (!it->second.xdp_set)
+				if (!it->second.xdp_set) {
 					install_tnafp(&it->second);
+					if (bpf_map_update_elem(fpm_dev_map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY) < 0)
+						cout << "Could not update tx_port map contents ... " << endl;
+
+				}
 			}
+			return 0;
+		}
+
+		int deploy_tnafpm(void)
+		{
+			int idx = 0;
+			int jmp_tbl_fd = bpf_map__fd(skel->maps.jmp_table);
+
+			if (bpf_map_update_elem(jmp_tbl_fd, &idx, &fpm_fd, BPF_ANY) < 0)
+				cout << "Could not update jmp_table map contents ... " << endl;
+			
 			return 0;
 		}
 
@@ -138,6 +172,15 @@ class Tnafpd {
 		int _ifindex;
 		int _flags = XDP_FLAGS_SKB_MODE; /* default */
 		int map_fd;
+		struct bpf_prog_load_attr fpm_prog_load_attr = {
+			.file = "/home/marcelo/tna/build/.output/tnafpm.bpf.o",
+			.prog_type = BPF_PROG_TYPE_XDP
+		};
+		struct bpf_object *fpm_bpf_obj = nullptr;
+		struct bpf_program *fpm_bpf_prog;
+		struct bpf_map *fpm_dev_map; 
+		int fpm_dev_map_fd;
+		int fpm_fd;
 		//unordered_map<string, struct tna_interface> tnainterfaces; //m-> this propably should be in tnaotm (tnaodb)
 		
 

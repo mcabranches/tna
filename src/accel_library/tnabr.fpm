@@ -4,7 +4,7 @@
 
 
 SEC("TNAFPM")
-static __always_inline int tnabr(struct xdp_md* ctx)
+int tnabr(struct xdp_md* ctx)
 {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
@@ -72,4 +72,6 @@ static __always_inline int tnabr(struct xdp_md* ctx)
     {% endif %}
 	return XDP_PASS;
 }
+
+char _license[] SEC("license") = "GPL";
 
