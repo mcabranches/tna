@@ -115,7 +115,6 @@ class Tnafpd {
 			}
 		}
 
-		//int install_xdp_tnabr(struct tna_interface *interface)
 		int install_tnafp(struct tna_interface *interface)
 		{
 			int err;
@@ -130,25 +129,12 @@ class Tnafpd {
 
 					uninstall_tnafp(interface);
 				}
-
-				/*map_fd = bpf_map__fd(skel->maps.tx_port);
-
-				cout << "######### MAP FD " << map_fd << endl;
-				int u = 1;
-				//if ((bpf_map_update_elem(map_fd, (int *)interface->ifindex, (int *)interface->ifindex, BPF_ANY)) != 0) {
-				if ((bpf_map_update_elem(map_fd, (int *)&u, (int *)&u, BPF_ANY)) != 0) {
-					cout << "Could not update redirect map contents ..." << endl;
-
-				}*/
-
 				interface->xdp_set = 1;
-				//tnainterfaces[interface->ifname] = *interface;
 			}
 
 			return err;
 		}
 
-		//int uninstall_xdp_tnabr(struct tna_interface *interface) 
 		int uninstall_tnafp(struct tna_interface *interface) 
 		{
 			if (interface->xdp_set == 1) {
@@ -156,11 +142,7 @@ class Tnafpd {
 
 				util::uninstall_xdp(interface->ifindex, _flags);
 
-				/*if ((bpf_map_delete_elem(map_fd, (int *) interface->ifindex)) != 0)
-					cout << "Could not update redirect map contents ..." << endl;*/
-
 				interface->xdp_set = 0;
-				//tnainterfaces.erase(interface->ifname);
 			}
 
 			return 0;
@@ -180,18 +162,10 @@ class Tnafpd {
 		struct bpf_program *fpm_bpf_prog;
 		struct bpf_map *fpm_dev_map; 
 		int fpm_dev_map_fd;
-		int fpm_fd;
-		//unordered_map<string, struct tna_interface> tnainterfaces; //m-> this propably should be in tnaotm (tnaodb)
-		
+		int fpm_fd;		
 
 		int _destroy_tnafp(void)
 		{
-			//unordered_map<string, struct tna_interface>::iterator it;
-
-			//m-> should be this called tnaodb using a map defined on tnatm?
-			//for (it = tnainterfaces.begin(); it != tnainterfaces.end(); ++it) {
-			//	uninstall_tnafp(&it->second);
-			//}
 			tnafp_bpf__destroy(skel);
 
 			return 0;

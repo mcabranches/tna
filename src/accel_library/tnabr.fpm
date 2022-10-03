@@ -9,7 +9,6 @@ int tnabr(struct xdp_md* ctx)
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     struct tna_meta_t tna_meta = {0};
-    //tna_meta.fdb_params;
     tna_meta.eth = NULL;
     tna_meta.iph = NULL;
     tna_meta.vlh = NULL;

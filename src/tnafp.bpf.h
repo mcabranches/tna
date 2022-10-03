@@ -16,13 +16,6 @@
                 })
 
 
-/*struct {
-	__uint(type, BPF_MAP_TYPE_DEVMAP);
-	__uint(max_entries, 20);
-	__type(key, int);
-	__type(value, int);
-} tx_port SEC(".maps");*/
-
 struct {
 	__uint(type, BPF_MAP_TYPE_PROG_ARRAY);
 	__uint(max_entries, 20);
@@ -30,12 +23,3 @@ struct {
 	__uint(value_size, sizeof(int));
 	//__array(values, int (void *));
 } jmp_table SEC(".maps");
-
-
-
-/*struct bpf_map_def SEC("maps") jmp_table = {
-	.type = BPF_MAP_TYPE_PROG_ARRAY,
-	.key_size = sizeof(__u32),
-	.value_size = sizeof(__u32),
-	.max_entries = 34,
-};*/
