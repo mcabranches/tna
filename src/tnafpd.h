@@ -155,7 +155,7 @@ class Tnafpd {
 		int _flags = XDP_FLAGS_SKB_MODE; /* default */
 		int map_fd;
 		struct bpf_prog_load_attr fpm_prog_load_attr = {
-			.file = "/home/marcelo/tna/build/.output/tnafpm.bpf.o",
+			.file = "./build/.output/tnafpm.bpf.o",
 			.prog_type = BPF_PROG_TYPE_XDP
 		};
 		struct bpf_object *fpm_bpf_obj = nullptr;
