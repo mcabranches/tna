@@ -1,0 +1,12 @@
+#include "tnafp.bpf.h"
+
+
+SEC("xdptna")
+int xdp_tna_main_0(struct xdp_md* ctx) {
+
+	return {{ fpms['fpm1'] }}(ctx);
+}
+
+char _license[] SEC("license") = "GPL";
+
+
