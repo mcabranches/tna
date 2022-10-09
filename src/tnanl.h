@@ -15,6 +15,7 @@
 #include <netlink/netlink.h>
 #include <netlink/route/link.h>
 #include <netlink/route/link/vlan.h>
+#include <netlink/route/link/bridge.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/neighbour.h>
 #include <netlink/route/neightbl.h>
@@ -28,33 +29,31 @@
 #include <linux/if_bridge.h>
 #include <linux/if_link.h>
 #include <netinet/ether.h>
-#include <net/if.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#include <pthread.h> 
-#include "util.h"
-
-#define MAX_INTERFACES 32
+#include <pthread.h>
+#include "tnabr.h"
+#include "tnatm.h"
 
 class Tnanl {
 
     public:
         Tnanl(void) 
         {
-            cout << "Initializing tnanl" << endl;
+            cout << "Initializing Service Instrapection" << endl;
             connect_nlr_q();
             build_link_nl_cache();
             add_membership_nlr();
             pthread_create(&t1_tnanl, NULL, tna_mon_nl, nlr_g_sk);
         }
 
-       ~Tnanl(void) 
-       {
+        ~Tnanl(void) 
+        {
             close_nlr_q();
             drop_membership_nlr();
             pthread_cond_destroy(&tna_g_ns::cv1);
             pthread_mutex_destroy(&tna_g_ns::m1);
-       }
+        }
 
         void dump_cached_interfaces(void)
         {
@@ -77,121 +76,13 @@ class Tnanl {
             return;
         }
 
-        void create_tna_bridge(Tnabr *tnabr)
+        void init_tna_objects(Tnatm *tnatm)
         {
-            int master_index;
             struct tna_interface interfaces[MAX_INTERFACES] = { 0 };
             nl_cache_foreach(link_nl_cache, link_cache_cb, &interfaces);
-
-            for (int i = 0; i < MAX_INTERFACES; i++) {
-                if (interfaces[i].type == "bridge") {
-                    cout << "Found bridge: " << interfaces[i].ifname << endl;
-                    master_index = interfaces[i].ifindex;
-                    struct tna_bridge tnabridge;
-                    tnabridge.brname = interfaces[i].ifname;
-                    tnabridge.op_state = interfaces[i].op_state;
-                    tnabridge.op_state_str = interfaces[i].op_state_str;
-                    tnabr->add_tna_bridge(tnabridge);
-
-                    for (int i = 0; i < MAX_INTERFACES; i++) {
-                         if (interfaces[i].master_index == master_index) {
-                            interfaces[i].xdp_set = 0;
-                            if (interfaces[i].type == "Null")
-                                interfaces[i].type = "phys";
-                            tnabr->add_if_tna_bridge(tnabridge, interfaces[i]);
-                         }
-                    }
-                    tnabr->accel_tna_bridge(tnabridge); //move this to tna.h   
-                }
-            }
+            tnatm->create_tna_object(interfaces);
+    
         }
-
-
-        void update_tna_bridge(Tnabr *tnabr, struct tna_interface interface, int event_type)
-        {
-            unordered_map<string, struct tna_bridge>::iterator br_it;
-            unordered_map<string, struct tna_interface>::iterator if_it;
-            unordered_map<int, struct tna_vlan>::iterator vlan_it;
-
-            struct tna_bridge tnabridge;
-            char *br_name = NULL;
-            int xdp_set;
-
-            br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);
-
-            if (interface.type == "bridge") {
-                tnabridge.brname = interface.ifname;
-                tnabridge.op_state = interface.op_state;
-                tnabridge.op_state_str = interface.op_state_str;
-
-                if (!(tnabr->tnabrs.find(tnabridge.brname) == tnabr->tnabrs.end())) {
-                    cout << "bridge exists updating state ..." << endl;
-                    if_indextoname(interface.ifindex, br_name);
-                    tnabr->tnabrs[interface.ifname].op_state_str = interface.op_state_str;
-                    tnabridge.op_state = interface.op_state;
-                    tnabridge.op_state_str = interface.op_state_str;
-                }
-                else {
-                    tnabr->add_tna_bridge(tnabridge);
-                }
-            }
-
-            else if (interface.type == "phys") {
-                if_indextoname(interface.master_index, br_name);
-                if (!(tnabr->tnabrs[br_name].brifs.find(interface.ifname) == tnabr->tnabrs[br_name].brifs.end())) {
-                    cout << "Interface exists on bridge " << br_name << " updating state ..." << endl;
-                    xdp_set = tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set;
-                    tnabr->tnabrs[br_name].brifs[interface.ifname] = interface;
-                    tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set = xdp_set;
-                }
-                else if (interface.master_index > 1) {
-                    tnabr->add_if_tna_bridge(tnabridge, interface);
-                }
-            }
-
-            if (event_type == 1) {
-                if (interface.type == "phys") {
-
-                    if (interface.op_state_str == "down") {
-                        tnabr->uninstall_xdp_tnabr(&tnabr->tnabrs[br_name].brifs[interface.ifname]);
-                    }
-                    else if (interface.op_state_str == "up") {
-                        if (tnabr->tnabrs[br_name].op_state_str == "up")
-                            tnabr->install_xdp_tnabr(&tnabr->tnabrs[br_name].brifs[interface.ifname]);
-                    }   
-                }
-                else if (interface.type == "bridge") {
-
-                    for (if_it = tnabr->tnabrs[br_name].brifs.begin(); if_it != tnabr->tnabrs[br_name].brifs.end(); ++if_it) {
-
-                        if (interface.op_state_str == "down")
-                            tnabr->uninstall_xdp_tnabr(&if_it->second);
-                        else if (interface.op_state_str == "up")
-                            tnabr->install_xdp_tnabr(&if_it->second);
-                    }       
-                }
-            }
-
-            if (event_type == 2) {
-                if (interface.type == "phys") {
-                    if (interface.master_index != 0) {
-                        tnabr->remove_if_tna_bridge(tnabr->tnabrs[br_name], &tnabr->tnabrs[br_name].brifs[interface.ifname]);
-                    }
-                }
-            }
-
-            /* DEBUG */
-            /*cout << "\n\nEVENT_TYPE: " << event_type << endl;
-            cout << "n_ifname: " << interface.ifname << endl;
-            cout << "ifindex: " << interface.ifindex << endl;
-            cout << "master_index: " << interface.master_index << endl;
-            cout << "n_type: " << interface.type << endl;
-            cout << "n_opstate: " << interface.op_state_str << endl << endl;
-            cout << "xdp_set: " << tnabr->tnabrs[br_name].brifs[interface.ifname].xdp_set << endl;*/
-            //cout << "Event type: " << event_type << endl;
-            //cout << "num ifs " << tnabr->tnabrs.size() << endl;
-        }
-
 
     private:
         struct nl_sock *nlr_q_sk; //cache query nl route socket
@@ -292,8 +183,9 @@ class Tnanl {
             if (ifs_entry.type == "Null")
                 ifs_entry.type = "phys";
 
-            if (ifs_entry.ifindex == ifs_entry.master_index)
+            if (ifs_entry.ifindex == ifs_entry.master_index) {
                 ifs_entry.type = "bridge";
+            }
 
             if (if_info->ifi_flags & if_info->ifi_change) {
                 if (if_info->ifi_flags & IFF_UP)
@@ -303,14 +195,10 @@ class Tnanl {
             }
 
 
-            //if (attrs[IFLA_AF_SPEC]) {
-            //    ifs_entry.xdp_set = 1;
-            //}
-
-            /*cout << "family: " << if_info->ifi_family << endl;
-            cout << "type: " << if_info->ifi_type << endl;
-            cout << "\nifi_change: " << if_info->ifi_change << endl;
-            cout << "ifi_flags " << if_info->ifi_flags << endl;*/
+            //cout << "family: " << if_info->ifi_family << endl;
+            //cout << "type: " << if_info->ifi_type << endl;
+            //cout << "\nifi_change: " << if_info->ifi_change << endl;
+            //cout << "ifi_flags " << if_info->ifi_flags << endl;
 
             //cout << "MSG_TYPE: " << (int) nlh->nlmsg_type << endl;
             //cout << "ifname: " << ifs_entry.ifname << endl;
@@ -319,14 +207,16 @@ class Tnanl {
             
 
             if ((int) nlh->nlmsg_type == RTM_NEWLINK)
-                event_type = 1;
+                ifs_entry.tna_event_type = 1;
             
             if ((int) nlh->nlmsg_type == RTM_DELLINK)
-                event_type = 2;
+                ifs_entry.tna_event_type = 2;
+
+            //m-> Why not just call update_tna_bridge() from here? (and use the event to wake up tnafpa - fast path assembler)
 
             pthread_mutex_lock(&tna_g_ns::m1);
 
-            tna_g_ns::tna_event_type = event_type;
+            tna_g_ns::tna_event_type = ifs_entry.tna_event_type;
 
             tna_g_ns::tna_event_flag = tna_g_ns::TNA_BR_EVENT;
 
@@ -431,6 +321,8 @@ class Tnanl {
 
             if (ifs_entry->ifindex != if_info->ifi_index)
                 return 0;
+            
+            ifs_entry->has_vlan = 0;
 
             while (nla_ok(nla, remaining)) {
 
@@ -446,6 +338,7 @@ class Tnanl {
                                 //cout << "Detected VLAN on BR: " << ifs_entry->master_index << endl;
                                 /* build a list of active VLANs on an interface */
                                 ifs_entry->vlans[vinfo->vid].vid = vinfo->vid;
+                                ifs_entry->has_vlan = 1;
                                 
                                 if (vinfo->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
                                     ifs_entry->vlans[vinfo->vid].is_untagged_vlan = 1;
@@ -464,7 +357,7 @@ class Tnanl {
             }
             
             return 0;
-        }  
+        } 
 
         static void get_initial_br_vlan_info(void *interface)
         {

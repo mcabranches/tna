@@ -18,38 +18,51 @@
 #include <queue>
 #include <condition_variable>
 #include <mutex>
+#include <net/if.h>
+#include <fstream>
 
 
 using namespace std;
+
 
 struct tna_vlan {
 	int vid;
 	int is_untagged_vlan;
 };
 
-
 struct tna_interface {
 	int ifindex;
 	int master_index;
 	int is_veth;
 	int xdp_set;
+	int tna_event_type; //m-> topology manager should use this (see old update_tna_bridge - tnanl.h)
+	int has_vlan;
+	int ref_cnt; //To-do: control if interface is referenced by any TNAs service 
 	/* save vlan list for each interface on tna_bridge object */
-	unordered_map<int, struct tna_vlan> vlans;
 	uint8_t op_state;
+	unordered_map<int, struct tna_vlan> vlans;
+	list<string> tna_svcs; //control what is installed on each interface 
 	string ifname;
 	string type;
 	string op_state_str;
 	string mac_addr_str;
 };
 
+struct Tnaodb {
+	class Tnabr *tnabr;
+	//add other objects
+	unordered_map <string, struct tna_interface> tnaifs;
+};
+
 //add atributes related to STP and vlans
 struct tna_bridge {
 	uint8_t op_state;
-	string brname;
-	string op_state_str;
 	int has_vlan;
 	int has_untagged_vlan;
-	unordered_map<string, struct tna_interface> brifs;
+	int stp_enabled;
+	string brname;
+	string op_state_str;
+	unordered_map<string, struct tna_interface *> brifs; //change this to a pointer to tnaodb interfaces
 };
 
 /* TNA global variables */
