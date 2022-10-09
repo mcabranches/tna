@@ -103,7 +103,6 @@ class Tnabr {
 			return 0;
 		}
 
-		//To-do add code to update STP status
 		int update_tna_bridge(struct tna_interface *interface)
 		{
             struct tna_bridge tnabridge;

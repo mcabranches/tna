@@ -40,7 +40,7 @@ class Tnanl {
     public:
         Tnanl(void) 
         {
-            cout << "Initializing Service Instrapection" << endl;
+            cout << "Initializing Service Instrospection" << endl;
             connect_nlr_q();
             build_link_nl_cache();
             add_membership_nlr();
@@ -212,7 +212,6 @@ class Tnanl {
             if ((int) nlh->nlmsg_type == RTM_DELLINK)
                 ifs_entry.tna_event_type = 2;
 
-            //m-> Why not just call update_tna_bridge() from here? (and use the event to wake up tnafpa - fast path assembler)
 
             pthread_mutex_lock(&tna_g_ns::m1);
 

@@ -44,14 +44,9 @@ namespace tna {
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].xdp_set = 0;
         }
 
-        //tnanl->update_state_tna_bridge(tnabr, tna_g_ns::interface_g);
         if (tna_g_ns::tna_event_flag & tna_g_ns::TNA_BR_EVENT) {
             tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
         }
-
-        /*else if ((tna_g_ns::tna_event_flag & tna_g_ns::TNA_IPT_EVENT)) {
-            tnaipt->update_tnaipt(event_type);
-        }*/
 
         tnatm->update_tna_topo();
         tnatm->tna_topo_print();

@@ -59,7 +59,7 @@ class Tnatm {
             int master_index;
             for (int i = 0; i < MAX_INTERFACES; i++) {
                 if (interfaces[i].type == "bridge") {
-                    cout << "Found bridge: " << interfaces[i].ifname << endl;
+                    //cout << "Found bridge: " << interfaces[i].ifname << endl;
                     master_index = interfaces[i].ifindex;
                     struct tna_bridge tnabridge;
                     tnabridge.brname = interfaces[i].ifname;
@@ -73,14 +73,8 @@ class Tnatm {
                             if (interfaces[i].type == "Null")
                                 interfaces[i].type = "phys";
                             
-                            cout << "NAAAME: " <<  interfaces[i].ifname << endl;
-
                             tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
-
-                            //tnaodb.tnabr->add_if_tna_bridge(tnabridge, interfaces[i]);
                             tnaodb.tnabr->add_if_tna_bridge(tnabridge, &tnaodb.tnaifs[interfaces[i].ifname]);
-                            //tnafpd.install_tnafp(&interfaces[i]);
-                            //cout << "####" << interfaces[i].ifname << " xdp_set :::" << interfaces[i].xdp_set << endl;
                          }
                     }
                 }
@@ -105,8 +99,6 @@ class Tnatm {
             prev_tna_topo = tna_topo;
             tna_topo.clear();
 
-            //tna_topo_add_fp();
-
             unordered_map<string, struct tna_bridge>::iterator br_it;
             unordered_map<string, struct tna_interface>::iterator if_it;
 
@@ -117,11 +109,6 @@ class Tnatm {
                 if (br_it->second.brname != "") {
                     cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
                     fpms.push_back("tnabr");
-                    //tna_topo.put("fp", "tnabr");
-                    //tna_topo_add_fpm("fpm", "tnabr");
-                    //tna_topo_add_fpm("fpm", "tnabr2");
-                    //tna_topo_add_fpm("fpm", "tnabr2");
-                    // cout << "###" << tna_topo.get<string>("fp") << endl;
                     tna_topo_add_br_config(br_it->second);
                 }
             }
@@ -134,20 +121,12 @@ class Tnatm {
                 }
             }
 
-            //fpms.push_back("tnartr");
             tna_topo_add_fpm();
             tna_topo_add_interfaces();
             
             return 0;
 		}
 
-        //prepare fp root node
-        //void tna_topo_add_fp(void)
-        //{
-        //    tna_topo.put("fpm", "");
-        //}
-
-        //void tna_topo_add_fpm(string parent, string fpm)
         void tna_topo_add_fpm(void)
         {
             list<string>::iterator it;
@@ -176,9 +155,6 @@ class Tnatm {
 
         }
 
-        //how to represent different entities of the same type, e.g., NICs?
-        //void tna_topo_add_config(string parent, string fpm, string config, string value)
-        //TO-DO: need to represent tnabrs as a list
         void tna_topo_add_br_config(struct tna_bridge tnabridge)
         {
             unordered_map<string, struct tna_interface *>::iterator it;
@@ -188,26 +164,18 @@ class Tnatm {
             string property_path;
             string property_path_child;
 
-            //tna_topo.put_child("fpms", child);
             property_path = "config.tnabr.brname";
             tna_topo.put(property_path, tnabridge.brname);
 
-            //need to update introspection logic to get vlans on bridge interface
             property_path = "config.tnabr.has_vlan";
             tna_topo.put(property_path, tnabridge.has_vlan);
 
-            //need a way to detect STP 
             property_path = "config.tnabr.stp_enabled";
             tna_topo.put(property_path, tnabridge.stp_enabled);
 
-
-            //property_path.append(tnabridge.brname);
-            //property_path.append(tnabridge.brname);
-            //property_path.append(".interfaces");
             property_path = "config.tnabr.interfaces";
 
             for (it = tnabridge.brifs.begin(); it != tnabridge.brifs.end(); ++it) {
-                //property_path_child = property_path;
                 property_path_child.erase();
                 property_path_child.append("name");
                 elements.put(property_path_child, it->second->ifname);
@@ -218,7 +186,6 @@ class Tnatm {
                 property_path_child.append("type");
                 elements.put(property_path_child, it->second->type);
                 subtree.push_back(make_pair("",elements));
-                //tnafpd.install_tnafp(&if_it->second);
             }
             tna_topo.add_child(property_path, subtree);
         }
