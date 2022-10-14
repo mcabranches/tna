@@ -23,7 +23,7 @@ int main(void)
     //fpm1 is the entry point
     //this dict should also describe fpm specific featues (e.g., vlans, stp)
     pt.put("fpm1", "tnabr");
-    //pt.put("tnabr", "tnartr");
+    pt.put("tnabr", "tnartr");
     //pt.put("tnartr", "tnaipt");
 
     boost::property_tree::json_parser::write_json(ss, pt);

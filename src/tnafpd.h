@@ -66,6 +66,8 @@ class Tnafpd {
 
 			fpm_dev_map_fd = bpf_map__fd(fpm_dev_map);
 
+			cout << "fpm_dev_map_fd " << fpm_dev_map_fd << endl;
+
 			return 0;
 
 		}
@@ -80,16 +82,20 @@ class Tnafpd {
 		{
 			unordered_map<string, struct tna_interface>::iterator it;
 			int idx;
+			cout << "fpm_dev_map_fd 0 " << fpm_dev_map_fd << endl;
+			bpf_object__unload(fpm_bpf_obj);
+			bpf_object__close(fpm_bpf_obj);
 			load_bpf_fpm();
 			deploy_tnafpm();
+
+			cout << "fpm_dev_map_fd 2 " << fpm_dev_map_fd << endl;
 
 			for (it = tnaodb->tnaifs.begin(); it != tnaodb->tnaifs.end(); ++it) {
 				if (!it->second.xdp_set) {
 					install_tnafp(&it->second);
-					if (bpf_map_update_elem(fpm_dev_map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY) < 0)
-						cout << "Could not update tx_port map contents ... " << endl;
-
 				}
+				if (bpf_map_update_elem(fpm_dev_map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY) < 0)
+						cout << "Could not update tx_port map contents ... " << endl;
 			}
 			return 0;
 		}
@@ -152,7 +158,7 @@ class Tnafpd {
 		int ret;
 		struct tnafp_bpf *skel;
 		int _ifindex;
-		int _flags = XDP_FLAGS_SKB_MODE; /* default */
+		int _flags = XDP_FLAGS_DRV_MODE; /* default */
 		int map_fd;
 		struct bpf_prog_load_attr fpm_prog_load_attr = {
 			.file = "./build/.output/tnafpm.bpf.o",
