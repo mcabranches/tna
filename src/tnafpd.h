@@ -57,8 +57,9 @@ class Tnafpd {
 		int load_bpf_fpm(void) 
 		{
 
+			//Unload previous data path
 			if (fpm_fd > 0)
-				return 1;
+				bpf_object__close(fpm_bpf_obj);
 
 			if (bpf_prog_load_xattr(&fpm_prog_load_attr, &fpm_bpf_obj, &fpm_fd))
 				throw std::runtime_error("load_xdp_program: cannot load object file");
@@ -88,12 +89,12 @@ class Tnafpd {
 			deploy_tnafpm();
 
 			for (it = tnaodb->tnaifs.begin(); it != tnaodb->tnaifs.end(); ++it) {
-				if ((!it->second.xdp_set) && it->second.ref_cnt > 0) {
+				if ((!it->second.xdp_set) && (it->second.ref_cnt > 0)) {
 					install_tnafp(&it->second);
+				}
+				if (it->second.ref_cnt > 0)
 					if (bpf_map_update_elem(fpm_dev_map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY) < 0)
 						cout << "Could not update tx_port map contents ... " << endl;
-
-				}
 			}
 			return 0;
 		}
