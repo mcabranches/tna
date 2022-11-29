@@ -99,6 +99,7 @@ class Tnatm {
             prev_tna_topo = tna_topo;
             tna_topo.clear();
 
+            tna_interface interface;
             unordered_map<string, struct tna_bridge>::iterator br_it;
             unordered_map<string, struct tna_interface>::iterator if_it;
 
@@ -115,9 +116,11 @@ class Tnatm {
 
             //process interfaces
             for (if_it = tnaodb.tnaifs.begin(); if_it != tnaodb.tnaifs.end(); ++if_it) {
-                if (if_it->second.ref_cnt < 1) {
+                //if (if_it->second.type == "bridge")
+                //    tnaodb.tnaifs.erase(if_it->first);
+                if (if_it->second.ref_cnt == 0) {
                     tnafpd.uninstall_tnafp(&if_it->second);
-                    tnaodb.tnaifs.erase(if_it->first);
+                    //tna_del_interface(if_it->first);
                 }
             }
 
@@ -126,6 +129,11 @@ class Tnatm {
             
             return 0;
 		}
+
+        void tna_del_interface(string ifname)
+        {
+            tnaodb.tnaifs.erase(ifname);
+        }
 
         void tna_topo_add_fpm(void)
         {
@@ -148,8 +156,10 @@ class Tnatm {
             boost::property_tree::ptree child;
 
             for (it = tnaodb.tnaifs.begin(); it != tnaodb.tnaifs.end(); ++it) {
-                elements.put_value(it->first);
-                child.push_back(make_pair("",elements));
+                if (it->second.ref_cnt > 0) {
+                    elements.put_value(it->first);
+                    child.push_back(make_pair("",elements));
+                }
             }
             tna_topo.put_child("interfaces", child);            
 
