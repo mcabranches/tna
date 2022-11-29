@@ -116,11 +116,8 @@ class Tnatm {
 
             //process interfaces
             for (if_it = tnaodb.tnaifs.begin(); if_it != tnaodb.tnaifs.end(); ++if_it) {
-                //if (if_it->second.type == "bridge")
-                //    tnaodb.tnaifs.erase(if_it->first);
                 if (if_it->second.ref_cnt == 0) {
                     tnafpd.uninstall_tnafp(&if_it->second);
-                    //tna_del_interface(if_it->first);
                 }
             }
 
@@ -130,10 +127,6 @@ class Tnatm {
             return 0;
 		}
 
-        void tna_del_interface(string ifname)
-        {
-            tnaodb.tnaifs.erase(ifname);
-        }
 
         void tna_topo_add_fpm(void)
         {
