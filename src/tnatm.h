@@ -65,6 +65,7 @@ class Tnatm {
                     tnabridge.brname = interfaces[i].ifname;
                     tnabridge.op_state = interfaces[i].op_state;
                     tnabridge.op_state_str = interfaces[i].op_state_str;
+                    tnabridge.stp_enabled = 0;
                     tnaodb.tnabr->add_tna_bridge(tnabridge);
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
@@ -108,7 +109,7 @@ class Tnatm {
             //process bridges
             for (br_it = tnaodb.tnabr->tnabrs.begin(); br_it != tnaodb.tnabr->tnabrs.end(); ++br_it) {
                 if (br_it->second.brname != "") {
-                    cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
+                    //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
                     fpms.push_back("tnabr");
                     tna_topo_add_br_config(br_it->second);
                 }
