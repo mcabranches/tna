@@ -19,15 +19,23 @@ namespace tna {
     {
 
         tna_interface ifs_entry, ifs_entry_tmp;
+        struct tna_event event;
         int event_type;
+        int event_flag;
 
         pthread_mutex_lock(&tna_g_ns::m1);
-        while (tna_g_ns::tna_event_type == 0) 
+        while (tna_g_ns::tna_event_q.empty())
             pthread_cond_wait(&tna_g_ns::cv1, &tna_g_ns::m1);
+
+        event = tna_g_ns::tna_event_q.front(); //get event
+        tna_g_ns::tna_event_q.pop(); //remove event
+
+        event_type = event.event_type;
+        event_flag = event.event_flag;
+        ifs_entry = event.interface;
         
-        event_type = tna_g_ns::tna_event_type;
-        ifs_entry = tna_g_ns::interface_g;
-        
+        if (event_type == tna_g_ns::TNA_STOP)
+            return 0;
         
 
         if (!(tnatm->tnaodb.tnaifs.find(ifs_entry.ifname) == tnatm->tnaodb.tnaifs.end())) {
@@ -44,7 +52,7 @@ namespace tna {
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].xdp_set = 0;
         }
 
-        if (tna_g_ns::tna_event_flag & tna_g_ns::TNA_BR_EVENT) {
+        if (event_flag & tna_g_ns::TNA_BR_EVENT) {
             tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
         }
 
@@ -55,10 +63,6 @@ namespace tna {
             cout << "Detected topology change\n";
             tnatm->deploy_tnafp();
         }
-
-
-        tna_g_ns::tna_event_type = 0;
-        tna_g_ns::tna_event_flag = 0;
 
         pthread_mutex_unlock(&tna_g_ns::m1);
 

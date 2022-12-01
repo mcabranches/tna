@@ -1,3 +1,4 @@
+/* TNA's service introspection - iptables */
 #ifndef IPT_QUERY_H
 #define IPT_QUERY_H
 
