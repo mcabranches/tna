@@ -65,6 +65,12 @@ struct tna_bridge {
 	unordered_map<string, struct tna_interface *> brifs; //change this to a pointer to tnaodb interfaces
 };
 
+struct tna_event {
+	int event_type;
+	int event_flag;
+	struct tna_interface interface;
+};
+
 /* TNA global variables */
 namespace tna_g_ns {
 	//signal nl events
@@ -72,23 +78,36 @@ namespace tna_g_ns {
     pthread_cond_t cv1 = PTHREAD_COND_INITIALIZER;
     int tna_event_type = 0;
 	int tna_event_flag = 0;
+	int tna_stop = 0;
 
-    struct tna_interface interface_g = {0};
-
-    int clean_g_ns(void)
-    {
-        pthread_mutex_lock(&tna_g_ns::m1);
-        tna_event_type = 1;
-        pthread_cond_signal(&cv1);
-        pthread_mutex_unlock(&tna_g_ns::m1);
-
-        return 0;
-    }
+	enum tna_event_type {
+		TNA_ADD = 1,
+		TNA_DEL,
+		TNA_STOP
+	};
 
 	enum tna_event_flags {
 		TNA_BR_EVENT = 1 << 0,
 		TNA_IPT_EVENT = 1 << 1,
 	};
+
+    struct tna_interface interface_g = {0};
+
+	queue<struct tna_event> tna_event_q;
+
+    int clean_g_ns(void)
+    {
+        pthread_mutex_lock(&tna_g_ns::m1);
+		struct tna_event event;
+		event.event_type = tna_g_ns::TNA_STOP; //stop
+		while (!tna_g_ns::tna_event_q.empty())
+			tna_event_q.pop();
+        tna_event_q.push(event);
+        pthread_cond_signal(&cv1);
+        pthread_mutex_unlock(&tna_g_ns::m1);
+        return 0;
+    }
+
 }
 
 

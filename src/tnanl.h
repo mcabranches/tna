@@ -1,3 +1,4 @@
+/* TNA's service instrospection - Netlink */
 #ifndef TNANL_H
 #define TNANL_H
 /* steps using libnl
@@ -117,7 +118,7 @@ class Tnanl {
             struct ifinfomsg* if_info = (struct ifinfomsg*) (nlmsg_data(nlh));
             struct bridge_vlan_info *vinfo;
             struct tna_interface ifs_entry = { 0 };
-            int event_type = 0;
+            struct tna_event tna_event;
 
             struct nlattr *attrs[IFLA_MAX+1];
 
@@ -187,7 +188,8 @@ class Tnanl {
                 ifs_entry.type = "bridge";
             }
 
-            if (if_info->ifi_flags & if_info->ifi_change) {
+
+            if (if_info->ifi_flags && if_info->ifi_change) {
                 if (if_info->ifi_flags & IFF_UP)
                     ifs_entry.op_state_str = "up";
                 else
@@ -212,14 +214,17 @@ class Tnanl {
             if ((int) nlh->nlmsg_type == RTM_DELLINK)
                 ifs_entry.tna_event_type = 2;
 
+            if (!(if_info->ifi_change))
+                ifs_entry.tna_event_type = 0; //Just update status
+
 
             pthread_mutex_lock(&tna_g_ns::m1);
 
-            tna_g_ns::tna_event_type = ifs_entry.tna_event_type;
+            tna_event.interface = ifs_entry;
+            tna_event.event_flag = tna_g_ns::TNA_BR_EVENT;
+            tna_event.event_type = ifs_entry.tna_event_type;
 
-            tna_g_ns::tna_event_flag = tna_g_ns::TNA_BR_EVENT;
-
-            tna_g_ns::interface_g = ifs_entry;
+            tna_g_ns::tna_event_q.push(tna_event);
             
             pthread_cond_signal(&tna_g_ns::cv1);
             pthread_mutex_unlock(&tna_g_ns::m1);
