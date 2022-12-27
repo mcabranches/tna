@@ -490,6 +490,7 @@ LIBBPF_API int bpf_task_fd_query(int pid, int fd, __u32 flags, char *buf,
 
 enum bpf_stats_type /* defined in up-to-date linux/bpf.h */
 //m-> changed to solve c++ compilation error (https://github.com/libbpf/libbpf/issues/249)
+//c-> error not present with g++ 11. Tested with (11.3.0)
 #if defined(__cplusplus) && __GNUC__ < 11
 : int
 #endif
