@@ -488,8 +488,12 @@ LIBBPF_API int bpf_task_fd_query(int pid, int fd, __u32 flags, char *buf,
 				 __u32 *buf_len, __u32 *prog_id, __u32 *fd_type,
 				 __u64 *probe_offset, __u64 *probe_addr);
 
-enum bpf_stats_type; /* defined in up-to-date linux/bpf.h */
-
+enum bpf_stats_type /* defined in up-to-date linux/bpf.h */
+//m-> changed to solve c++ compilation error (https://github.com/libbpf/libbpf/issues/249)
+#if defined(__cplusplus) && __GNUC__ < 11
+: int
+#endif
+;
 LIBBPF_API int bpf_enable_stats(enum bpf_stats_type type);
 
 struct bpf_prog_bind_opts {
