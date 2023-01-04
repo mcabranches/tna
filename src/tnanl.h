@@ -214,15 +214,16 @@ class Tnanl {
             if ((int) nlh->nlmsg_type == RTM_DELLINK)
                 ifs_entry.tna_event_type = 2;
 
-            if (!(if_info->ifi_change))
-                ifs_entry.tna_event_type = 0; //Just update status
 
-
-            pthread_mutex_lock(&tna_g_ns::m1);
+            else if (!(if_info->ifi_change))
+                ifs_entry.tna_event_type = 0; //Fix this 01/01/2023 -> This causes segfault on del_if_tna_bridge
 
             tna_event.interface = ifs_entry;
             tna_event.event_flag = tna_g_ns::TNA_BR_EVENT;
             tna_event.event_type = ifs_entry.tna_event_type;
+
+
+            pthread_mutex_lock(&tna_g_ns::m1);
 
             tna_g_ns::tna_event_q.push(tna_event);
             
@@ -404,6 +405,5 @@ class Tnanl {
                 return;
         }
 };
-
 
 #endif

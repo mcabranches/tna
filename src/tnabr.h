@@ -59,6 +59,10 @@ class Tnabr {
 			if (tnainterface->ifindex == tnainterface->master_index) {
 				return -1;
 			}
+
+			if (tnabridge.brname.length() == 0)
+				return -2;
+				
 			cout << "Adding interface " << tnainterface->ifname << " to TNA bridge " << tnabridge.brname << endl;
 			cout << "Interface type: " << tnainterface->type << endl;
 
@@ -74,6 +78,9 @@ class Tnabr {
 
 		int remove_if_tna_bridge(struct tna_bridge tnabridge, struct tna_interface *tnainterface) 
 		{
+			if (tnabridge.brname.length() == 0)
+				return -2;
+
 			unordered_map<string, struct tna_interface *>::iterator it;
 
 			cout << "Removing interface " << tnainterface->ifname << " from TNA bridge " << tnabridge.brname << endl;
@@ -145,6 +152,8 @@ class Tnabr {
             else if ((interface->type == "phys") || interface->type == "veth") {
                 if_indextoname(interface->master_index, br_name);
                 if (!(tnabrs[br_name].brifs.find(interface->ifname) == tnabrs[br_name].brifs.end())) {
+					if (tnabrs[br_name].brname.length() == 0)
+						return -2;
                     cout << "Interface exists on bridge " << br_name << " updating state ..." << endl;
                     xdp_set = tnabrs[br_name].brifs[interface->ifname]->xdp_set;
                     tnabrs[br_name].brifs[interface->ifname] = interface;
@@ -176,6 +185,10 @@ class Tnabr {
 			
 			/* Verify vlans and tagging on deployed bridges -- this will custmize the deployed XDP code */
             for (br_it = tnabrs.begin(); br_it != tnabrs.end(); ++br_it) {
+
+				if (br_it->second.brname.length() == 0)
+					return -2;
+
                 br_it->second.has_vlan = 0;
                 br_it->second.has_untagged_vlan = 0;
 
