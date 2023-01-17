@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "tnabr.h"
+#include "tnartr.h"
 #include "tnafpd.h"
 
 #define MAX_INTERFACES 32
@@ -35,6 +36,12 @@ class Tnatm {
         {
             cout << "Adding tnabr object to tnaodb" << endl;
             tnaodb.tnabr = tnabr;
+        }
+
+        void add_tnartr(Tnartr *tnartr)
+        {
+            cout << "Adding tnartr object to tnaodb" << endl;
+            tnaodb.tnartr = tnartr;
         }
 
         int update_tna_topo(void) 
@@ -66,6 +73,9 @@ class Tnatm {
                     tnabridge.op_state = interfaces[i].op_state;
                     tnabridge.op_state_str = interfaces[i].op_state_str;
                     tnabridge.stp_enabled = 0;
+                    tnabridge.has_l3_br_dev = interfaces[i].has_l3;
+                    tnabridge.has_l3 = interfaces[i].has_l3; 
+                    tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnabr->add_tna_bridge(tnabridge);
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
@@ -111,6 +121,10 @@ class Tnatm {
                 if (br_it->second.brname != "") {
                     //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
                     fpms.push_back("tnabr");
+
+                    if (br_it->second.has_l3)
+                        fpms.push_back("tnartr");
+                        
                     tna_topo_add_br_config(br_it->second);
                 }
             }
@@ -173,6 +187,9 @@ class Tnatm {
 
             property_path = "config.tnabr.has_vlan";
             tna_topo.put(property_path, tnabridge.has_vlan);
+
+            property_path = "config.tnabr.has_l3";
+            tna_topo.put(property_path, tnabridge.has_l3);
 
             property_path = "config.tnabr.stp_enabled";
             tna_topo.put(property_path, tnabridge.stp_enabled);

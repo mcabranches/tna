@@ -37,32 +37,37 @@ struct tna_interface {
 	int xdp_set;
 	int tna_event_type; //m-> topology manager should use this (see old update_tna_bridge - tnanl.h)
 	int has_vlan;
-	int ref_cnt; //To-do: control if interface is referenced by any TNAs service 
-	/* save vlan list for each interface on tna_bridge object */
+	int has_l3;
+	int ref_cnt; 
 	uint8_t op_state;
+	/* save vlan list for each interface on tna_bridge object */
 	unordered_map<int, struct tna_vlan> vlans;
 	list<string> tna_svcs; //control what is installed on each interface 
 	string ifname;
 	string type;
 	string op_state_str;
 	string mac_addr_str;
+	char ip4Addr[INET_ADDRSTRLEN];
 };
 
 struct Tnaodb {
 	class Tnabr *tnabr;
+	class Tnartr *tnartr;
 	//add other objects
 	unordered_map <string, struct tna_interface> tnaifs;
 };
 
-//add atributes related to STP and vlans
+//add atributes related to STP, l3 and vlans
 struct tna_bridge {
 	uint8_t op_state;
 	int has_vlan;
+	int has_l3;
+	int has_l3_br_dev;
 	int has_untagged_vlan;
 	int stp_enabled;
 	string brname;
 	string op_state_str;
-	unordered_map<string, struct tna_interface *> brifs; //change this to a pointer to tnaodb interfaces
+	unordered_map<string, struct tna_interface *> brifs;
 };
 
 struct tna_event {
@@ -88,7 +93,8 @@ namespace tna_g_ns {
 
 	enum tna_event_flags {
 		TNA_BR_EVENT = 1 << 0,
-		TNA_IPT_EVENT = 1 << 1,
+		TNA_RTR_EVENT = 1 << 1,
+		TNA_IPT_EVENT = 1 << 2,
 	};
 
     struct tna_interface interface_g = {0};
