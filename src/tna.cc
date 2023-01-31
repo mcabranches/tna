@@ -26,6 +26,9 @@ int main(void)
     Tnabr tnabr = Tnabr();
     tnatm.add_tnabr(&tnabr);
 
+    Tnartr tnartr = Tnartr();
+    tnatm.add_tnartr(&tnartr);
+
     tnanl.init_tna_objects(&tnatm);
     
     cout << "-----------------------" << endl;

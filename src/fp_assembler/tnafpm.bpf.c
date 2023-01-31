@@ -69,8 +69,8 @@ int tnabr(struct xdp_md* ctx)
 
 	if (tna_meta.fdb_params.egress_ifindex > 0 && tna_meta.fdb_params.flags == 1) {
 		//Is it possible to see if the port is untagged via the helper?
-		//if (tna_meta.fdb_params.egress_ifindex == 5)
-		//	vlan_tag_pop(ctx, tna_meta.eth);
+		if (tna_meta.fdb_params.egress_ifindex == 5)
+			vlan_tag_pop(ctx, tna_meta.eth);
 		return bpf_redirect_map(&tx_port, tna_meta.fdb_params.egress_ifindex, 0);
 	}
 
