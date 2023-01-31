@@ -93,9 +93,9 @@ class Tnanl {
         {
             //cout << "\nBuilding rtnl_cache ..." << endl;
 
-            if (rtnl_link_alloc_cache(nlr_q_sk, AF_UNSPEC, &link_nl_cache) < 0)
+            if (rtnl_link_alloc_cache(nlr_q_l_sk, AF_UNSPEC, &link_nl_cache) < 0)
                 cout << "Error building link rtnl_cache ..." << endl;
-            if (rtnl_addr_alloc_cache(nlr_q_sk, &addr_nl_cache) < 0)
+            if (rtnl_addr_alloc_cache(nlr_q_a_sk, &addr_nl_cache) < 0) //01/31/2023 -> put this on another socket
                 cout << "Error building addr addr_cache ..." << endl;
 
 
@@ -103,7 +103,8 @@ class Tnanl {
         }
 
     private:
-        struct nl_sock *nlr_q_sk; //cache query nl route socket
+        struct nl_sock *nlr_q_l_sk; //cache query nl route socket (link)
+        struct nl_sock *nlr_q_a_sk; //cache query nl route socket (address)
         struct nl_sock *nlr_g_sk; //multicast group nl route socket
         struct nl_cache *link_nl_cache;
         struct nl_cache *addr_nl_cache;
@@ -114,8 +115,10 @@ class Tnanl {
         {
             //cout << "Connecting to NETLINK_ROUTE socket ..." << endl; 
 
-            nlr_q_sk = nl_socket_alloc();
-            nl_connect(nlr_q_sk, NETLINK_ROUTE);
+            nlr_q_l_sk = nl_socket_alloc();
+            nlr_q_a_sk = nl_socket_alloc();
+            nl_connect(nlr_q_l_sk, NETLINK_ROUTE);
+            nl_connect(nlr_q_a_sk, NETLINK_ROUTE);
 
             return 0;
         }
@@ -124,7 +127,8 @@ class Tnanl {
         {
             //cout << "Closing NETLINK_ROUTE socket" << endl;
 
-            nl_socket_free(nlr_q_sk);
+            nl_socket_free(nlr_q_l_sk);
+            nl_socket_free(nlr_q_a_sk);
 
             return 0;
         }
@@ -132,6 +136,11 @@ class Tnanl {
         static int nlr_g_cb(struct nl_msg *msg, void *arg)
         {
             //cout << "Received NETLINK_ROUTE event" << endl;
+            pthread_mutex_lock(&tna_g_ns::m1);
+            int stop = tna_g_ns::tna_stop;
+            pthread_mutex_unlock(&tna_g_ns::m1);
+            if (stop)
+                return 0;
     
             struct nlmsghdr* nlh = nlmsg_hdr(msg);
             Tnanl *self = arg;
@@ -286,6 +295,7 @@ class Tnanl {
                 if (ifs_entry->ip4Addr) {
                     ifs_entry->has_l3 = 1;
                     self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].has_l3 = 1;
+                    tna_event->event_flag |= tna_g_ns::TNA_RTR_EVENT;
                 }
             }
             else if ((int) nlh->nlmsg_type == RTM_DELADDR) {
@@ -293,7 +303,6 @@ class Tnanl {
                 self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].has_l3 = 0;
             }
 
-            //tna_event->event_flag |= tna_g_ns::TNA_RTR_EVENT;
             if ((self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].master_index != 0)
                                             || (ifs_entry->type ==  "bridge"))
                 tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
@@ -398,14 +407,10 @@ class Tnanl {
             
             get_initial_br_vlan_info(ifs_entry);
 
-            //rtnl_link_put(rtnl_link);
-
         }
 
         static void addr_cache_cb(struct nl_object *nl_object, void *interfaces)
         {
-            //remember to remove cache objects (put) after CB
-
             struct rtnl_addr *rtnl_addr = (struct rtnl_addr *)nl_object;
             struct tna_interface *ifs = (struct tna_interface*) interfaces;
 
@@ -439,9 +444,9 @@ class Tnanl {
             else 
                 ifs_entry->has_l3 = 1;
 
-            //rtnl_addr_put(rtnl_addr);
         }
 
+        //Service introspection thread main loop
         static void *tna_mon_nl(void *args) {
             struct nl_sock *sock = (struct nl_sock *) args;
             while(true) {
