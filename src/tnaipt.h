@@ -100,7 +100,7 @@ class Tnaipt {
             return;
         }
 
-        void update_tnaipt(int event_type)
+        void update_tna_ipt(int event_type)
         {
             if (event_type == 1) {
                 remove_tnaipt();
@@ -110,6 +110,11 @@ class Tnaipt {
                 install_tnaipt();
             }
             return;
+        }
+
+        bool has_ipt(void)
+        {
+            return install_ipt;
         }
 
 
@@ -157,7 +162,6 @@ class Tnaipt {
                     ipt_table.ipt_chains[chain].name = chain;
 
                     for (e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h)) {
-                        //struct ipt_entry e;
                         struct tna_ipt_rule ipt_rule;
                         ipt_rule.e = e;
                         ipt_rule.tna_supported = false;
@@ -212,11 +216,13 @@ class Tnaipt {
 
         void notify_ipt_state_change(int event_type)
         {
+            struct tna_event tna_event;
             pthread_mutex_lock(&tna_g_ns::m1);
 
-            tna_g_ns::tna_event_type = event_type;
+            tna_event.event_type = event_type;
+            tna_event.event_flag = tna_g_ns::TNA_IPT_EVENT;
 
-            tna_g_ns::tna_event_flag = tna_g_ns::TNA_IPT_EVENT;
+            tna_g_ns::tna_event_q.push(tna_event);
             
             pthread_cond_signal(&tna_g_ns::cv1);
             pthread_mutex_unlock(&tna_g_ns::m1);

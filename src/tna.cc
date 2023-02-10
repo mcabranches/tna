@@ -29,6 +29,9 @@ int main(void)
     Tnartr tnartr = Tnartr();
     tnatm.add_tnartr(&tnartr);
 
+    Tnaipt tnaipt = Tnaipt();
+    tnatm.add_tnaipt(&tnaipt);
+
     tnanl.init_tna_objects(&tnatm);
     
     cout << "-----------------------" << endl;
