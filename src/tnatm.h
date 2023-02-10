@@ -95,6 +95,7 @@ class Tnatm {
         int deploy_tnafp(void)
         {
             cout << "Updating TNA fast path" << endl;
+            call_tnafpa();
             tnafpd.deploy_tnafp(&tnaodb);
             return 0; 
         }
@@ -148,13 +149,14 @@ class Tnatm {
             list<string>::iterator it;
             boost::property_tree::ptree elements;
             boost::property_tree::ptree child;
+            string parent = "fpms";
 
             for (it = fpms.begin(); it != fpms.end(); ++it) {
                 elements.put_value(*it);
                 child.push_back(make_pair("",elements));
+                tna_topo.put_child(parent, child);
+                parent = it->c_str();
             }
-
-            tna_topo.put_child("fpms", child);
         }
 
         void tna_topo_add_interfaces(void)
@@ -225,6 +227,22 @@ class Tnatm {
             }
 
             return changed;
+        }
+
+        int call_tnafpa(void)
+        {
+            std::stringstream ss;
+            std::string pycmd;
+
+            boost::property_tree::json_parser::write_json(ss, tna_topo);
+
+            pycmd = "cd ./src/fp_assembler && python3 tnasynth.py '" + ss.str() + "'";
+
+            //cout << pycmd << endl;
+
+            system(pycmd.c_str());
+
+            return 0;
         }
 };
 #endif

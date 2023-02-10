@@ -60,6 +60,9 @@ class Tnafpd {
 			//Unload previous data path
 			if (fpm_fd > 0)
 				bpf_object__close(fpm_bpf_obj);
+			
+			//compile new data path
+			system("cd ./src/fp_assembler/ && make >> /dev/null");
 
 			if (bpf_prog_load_xattr(&fpm_prog_load_attr, &fpm_bpf_obj, &fpm_fd))
 				throw std::runtime_error("load_xdp_program: cannot load object file");
