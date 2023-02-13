@@ -53,6 +53,7 @@ struct tna_interface {
 struct Tnaodb {
 	class Tnabr *tnabr;
 	class Tnartr *tnartr;
+	class Tnaipt *tnaipt;
 	//add other objects
 	unordered_map <string, struct tna_interface> tnaifs;
 };
@@ -63,6 +64,7 @@ struct tna_bridge {
 	int has_vlan;
 	int has_l3;
 	int has_l3_br_dev;
+	int has_ipt;
 	int has_untagged_vlan;
 	int stp_enabled;
 	string brname;

@@ -5,12 +5,6 @@ fpms = []
 
 tnafp = json.loads(sys.argv[1])
 
-#get an ordered list of fpms based on their interdependencies
-for fpm in tnafp.keys():
-    if fpm == 'fpms':
-        key = tnafp['fpms']
-        fpms.append(key)
-
 environment = Environment(loader=FileSystemLoader("../accel_library"), trim_blocks=True)
 
 template = environment.get_template("tnafp.fpm")

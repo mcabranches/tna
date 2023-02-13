@@ -10,6 +10,7 @@
 
 #include "tnabr.h"
 #include "tnartr.h"
+#include "tnaipt.h"
 #include "tnafpd.h"
 
 #define MAX_INTERFACES 32
@@ -42,6 +43,12 @@ class Tnatm {
         {
             cout << "Adding tnartr object to tnaodb" << endl;
             tnaodb.tnartr = tnartr;
+        }
+
+        void add_tnaipt(Tnaipt *tnaipt)
+        {
+            cout << "Adding tnaipt object to tnaodb" << endl;
+            tnaodb.tnaipt = tnaipt;
         }
 
         int update_tna_topo(void) 
@@ -77,6 +84,11 @@ class Tnatm {
                     tnabridge.has_l3 = interfaces[i].has_l3; 
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnabr->add_tna_bridge(tnabridge);
+
+                    if (tnabridge.has_l3)
+                        if (tnaodb.tnaipt->has_ipt())
+                            tnabridge.has_ipt = 1;
+
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
                          if (interfaces[i].master_index == master_index) {
@@ -123,8 +135,13 @@ class Tnatm {
                     //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
                     fpms.push_back("tnabr");
 
-                    if (br_it->second.has_l3)
+                    if (br_it->second.has_l3) {
                         fpms.push_back("tnartr");
+                        if (tnaodb.tnaipt->has_ipt()) {
+                            br_it->second.has_ipt = 1;
+                            fpms.push_back("tnaipt");
+                        }
+                    }
                         
                     tna_topo_add_br_config(br_it->second);
                 }
@@ -192,6 +209,9 @@ class Tnatm {
 
             property_path = "config.tnabr.has_l3";
             tna_topo.put(property_path, tnabridge.has_l3);
+
+            property_path = "config.tnabr.has_ipt";
+            tna_topo.put(property_path, tnabridge.has_ipt);
 
             property_path = "config.tnabr.stp_enabled";
             tna_topo.put(property_path, tnabridge.stp_enabled);

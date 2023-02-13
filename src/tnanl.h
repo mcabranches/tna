@@ -275,7 +275,6 @@ class Tnanl {
         void parse_ifa(struct nlmsghdr* nlh, struct ifinfomsg* if_info, 
                             struct tna_interface* ifs_entry, struct tna_event* tna_event, Tnanl *self) 
         {
-            cout << "Parsing ifa" << endl;
             struct ifaddrmsg *iface = (struct ifaddrmsg *)nlmsg_data(nlh);
             struct nlattr *attrs[IFA_MAX+1];
             
@@ -311,8 +310,6 @@ class Tnanl {
         void parse_rtn(struct nlmsghdr* nlh, struct ifinfomsg* if_info, 
                             struct tna_interface* ifs_entry, struct tna_event* tna_event, Tnanl *self) 
         {
-            cout << "Parsing rtn" << endl;
-
             static char ip4Addr[INET_ADDRSTRLEN];
             struct ifaddrmsg *iface = (struct ifaddrmsg *)nlmsg_data(nlh);
 
