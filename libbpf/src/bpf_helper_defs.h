@@ -2,6 +2,9 @@
 
 /* Forward declarations of BPF structs */
 struct bpf_fib_lookup;
+struct bpf_fdb_lookup;
+struct bpf_ipt_lookup;
+struct bpf_ip_vs_lookup;
 struct bpf_sk_lookup;
 struct bpf_perf_event_data;
 struct bpf_perf_event_value;
@@ -21,6 +24,7 @@ struct pt_regs;
 struct sk_reuseport_md;
 struct sockaddr;
 struct tcphdr;
+struct iphdr;
 struct seq_file;
 struct tcp6_sock;
 struct tcp_sock;
@@ -4359,7 +4363,33 @@ static long (*bpf_ima_file_hash)(struct file *file, void *dst, __u32 size) = (vo
 static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *) 194;
 
 //m-> added support to bpf_fdb_lookup
+/*
+ * bpf_fdb_lookup
+ *
+ * 	fdb_lookup helper
+ *
+ * Returns
+ * 	Code to control L2 forwarding
+ */
 static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen, unsigned char *src_mac, unsigned char *dst_mac) = (void *) 186;
 
 //m-> bpf_ipt_lookup
+/*
+ * bpf_ipt_lookup
+ *
+ * 	ipt_lookup helper
+ *
+ * Returns
+ * 	Code to control forwarding based on IPtable filters
+ */
 static long (*bpf_ipt_lookup)(void *ctx, struct bpf_ipt_lookup *params, int plen, struct iphdr *iph) = (void *) 187;
+
+/*
+ * bpf_ip_vs_lookup
+ *
+ * 	Get the destination address of real server.
+ *
+ * Returns
+ * 	On success, zero. On error, a negative value.
+ */
+static int (*bpf_ip_vs_lookup)(struct xdp_md *ctx, struct bpf_ip_vs_lookup *params, int plen, struct iphdr *iph) = (void *) 188;
