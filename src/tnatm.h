@@ -107,8 +107,8 @@ class Tnatm {
         int deploy_tnafp(void)
         {
             cout << "Updating TNA fast path" << endl;
-            call_tnafpa();
-            tnafpd.deploy_tnafp(&tnaodb);
+            //call_tnafpa();
+            //tnafpd.deploy_tnafp(&tnaodb);
             return 0; 
         }
 

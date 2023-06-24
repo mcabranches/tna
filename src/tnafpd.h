@@ -31,9 +31,10 @@ class Tnafpd {
 			destroy_tnafp();
         }
 
-		int load_bpf(void) 
+		int load_bpf_xdp(void) 
 		{
 			/* Load and verify BPF application */
+			cout << "Loading BPF" << endl;
 			skel = tnafp_bpf__open();
 			if (!skel) {
 
@@ -54,6 +55,40 @@ class Tnafpd {
 				return 0;
 		}
 
+		int load_bpf(void)
+		{
+			DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_hook,
+				.ifindex = 1, .attach_point = BPF_TC_INGRESS);
+			DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_opts,
+				.handle = 1, .priority = 1);
+			
+			bool hook_created = false;
+			int err;
+
+			skel = tnafp_bpf__open_and_load();
+
+			cout << skel << endl;
+
+			if (!skel) {
+				fprintf(stderr, "Failed to open BPF skeleton\n");
+				return 1;
+			}
+
+			err = bpf_tc_hook_create(&tc_hook);
+			if (!err)
+				hook_created = true;
+			if (err && err != -EEXIST) {
+				fprintf(stderr, "Failed to create TC hook: %d\n", err);
+			//goto cleanup;
+			}
+
+		tc_opts.prog_fd = bpf_program__fd(skel->progs.xdp_tna_main_0);
+		err = bpf_tc_attach(&tc_hook, &tc_opts);
+		cout << err << endl;
+			
+			return 0;
+		}
+
 		int load_bpf_fpm(void) 
 		{
 
@@ -62,7 +97,7 @@ class Tnafpd {
 				bpf_object__close(fpm_bpf_obj);
 			
 			//compile new data path
-			system("cd ./src/fp_assembler/ && make >> /dev/null");
+			//system("cd ./src/fp_assembler/ && make >> /dev/null");
 
 			if (bpf_prog_load_xattr(&fpm_prog_load_attr, &fpm_bpf_obj, &fpm_fd))
 				throw std::runtime_error("load_xdp_program: cannot load object file");
@@ -88,8 +123,8 @@ class Tnafpd {
 		{
 			unordered_map<string, struct tna_interface>::iterator it;
 			int idx;
-			load_bpf_fpm();
-			deploy_tnafpm();
+			//load_bpf_fpm();
+			//deploy_tnafpm();
 
 			for (it = tnaodb->tnaifs.begin(); it != tnaodb->tnaifs.end(); ++it) {
 				if ((!it->second.xdp_set) && (it->second.ref_cnt > 0)) {

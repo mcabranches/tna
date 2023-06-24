@@ -129,15 +129,15 @@ namespace util {
 
     static int install_xdp(struct bpf_program *xdp_prog, int ifindex, int xdp_flags)
     {
-	    int bpf_prog_fd = bpf_program__fd(xdp_prog);
+	    // int bpf_prog_fd = bpf_program__fd(xdp_prog);
 
-	    if (bpf_xdp_attach(ifindex, bpf_prog_fd, xdp_flags, NULL) < 0) {
-			printf("Error linking fd to xdp with offload flags\n");
-			return -1;
-	    }
-	    else {
-		    printf("XDP program loaded\n");
-	    }
+	    // if (bpf_xdp_attach(ifindex, bpf_prog_fd, xdp_flags, NULL) < 0) {
+		// 	printf("Error linking fd to xdp with offload flags\n");
+		// 	return -1;
+	    // }
+	    // else {
+		//     printf("XDP program loaded\n");
+	    // }
 
 	return 0;
     }
