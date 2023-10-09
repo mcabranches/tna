@@ -14,6 +14,6 @@ Go to the perf directory and run:
 
 * ./perf record -F 99 -a -g -- sleep 60
 
-Generate the flamegraphs
+## Generate the flamegraphs
 
 * ./perf script | /data/FlameGraph/stackcollapse-perf.pl |/data/FlameGraph/flamegraph.pl > /dst_dir/flame.svg
