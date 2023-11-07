@@ -54,20 +54,20 @@ namespace tna {
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].xdp_set = 0;
         }
 
-        //if (event_flag & tna_g_ns::TNA_BR_EVENT) {
-        //    cout << "TNA_BR_EVENT" << endl;
-        //    tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
-        //}
+        if (event_flag & tna_g_ns::TNA_BR_EVENT) {
+            cout << "TNA_BR_EVENT" << endl;
+            tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
+        }
 
         if (event_flag & tna_g_ns::TNA_RTR_EVENT) {
             cout << "TNA_RTR_EVENT" << endl;
             tnatm->tnaodb.tnartr->update_tna_rtr(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
         }
 
-        //if (event_flag & tna_g_ns::TNA_IPT_EVENT) {
-        //    cout << "TNA_IPT_EVENT" << endl;
-        //    tnatm->tnaodb.tnaipt->update_tna_ipt(event_flag);
-        //}
+        if (event_flag & tna_g_ns::TNA_IPT_EVENT) {
+            cout << "TNA_IPT_EVENT" << endl;
+            tnatm->tnaodb.tnaipt->update_tna_ipt(event_flag);
+        }
 
         tnatm->update_tna_topo();
         tnatm->tna_topo_print();
