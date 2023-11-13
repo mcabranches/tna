@@ -6,7 +6,7 @@ https://github.com/mcabranches/linux.git. Please add BTF support. Iptables shoul
 
 ## Install dependencies
 
-    sudo apt install clang llvm libelf-dev libpcap-dev gcc-multilib build-essential libnl-3-200 libnl-3-dev libnl-route-3-200 libnl-route-3-dev libiptc-dev libxtables-dev libboost-all-dev pkg-config
+    sudo apt install clang llvm libelf-dev libpcap-dev gcc-multilib build-essential libnl-3-200 libnl-3-dev libnl-route-3-200 libnl-route-3-dev libiptc-dev libxtables-dev libboost-all-dev pkg-config python3-jinja2
 
 ## Compilation
 
