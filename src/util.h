@@ -13,6 +13,7 @@
 #include <iostream>
 #include <linux/if_link.h>
 #include <list>
+#include <set>
 #include <iterator>
 #include <unordered_map>
 #include <queue>
@@ -38,7 +39,8 @@ struct tna_interface {
 	int tna_event_type; //m-> topology manager should use this (see old update_tna_bridge - tnanl.h)
 	int has_vlan;
 	int has_l3;
-	int ref_cnt; 
+	int ref_cnt;
+	int ignore;
 	uint8_t op_state;
 	/* save vlan list for each interface on tna_bridge object */
 	unordered_map<int, struct tna_vlan> vlans;
@@ -56,6 +58,7 @@ struct Tnaodb {
 	class Tnaipt *tnaipt;
 	//add other objects
 	unordered_map <string, struct tna_interface> tnaifs;
+	set<string> ignore_ifs;
 };
 
 //add atributes related to STP, l3 and vlans
@@ -70,6 +73,11 @@ struct tna_bridge {
 	string brname;
 	string op_state_str;
 	unordered_map<string, struct tna_interface *> brifs;
+};
+
+struct tna_rtr {
+	int has_rtr_br;
+	unordered_map<string, struct tna_interface *> rtrifs;
 };
 
 struct tna_event {

@@ -32,6 +32,9 @@ int main(void)
     Tnaipt tnaipt = Tnaipt();
     tnatm.add_tnaipt(&tnaipt);
 
+    tnatm.tnaodb.ignore_ifs.insert("lo");
+    tnatm.tnaodb.ignore_ifs.insert("enp0s3");
+
     tnanl.init_tna_objects(&tnatm);
     
     cout << "-----------------------" << endl;

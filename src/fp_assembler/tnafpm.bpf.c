@@ -68,30 +68,27 @@ static __always_inline int tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_met
 		__builtin_memcpy(tna_meta->eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta->eth->h_source, fib_params.smac, ETH_ALEN);
 
+		//return bpf_redirect(fib_params.ifindex, 0);
+
         //#bridge/vlan dependent
-		tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
-		tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
+		//tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
+		//tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
 
         
-		bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
+		//bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
         //#end of bridge/vlan dependent
 
-		            //#tnartr dependent
-		tna_meta->ipt_params.ifindex = fib_params.ifindex;
-		tna_meta->ipt_params.egress_ifindex = tna_meta->fdb_params.egress_ifindex;
-		bpf_ipt_lookup(ctx, &tna_meta->ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta->iph);
-
-		bpf_debug("verdict: %i\n", tna_meta->ipt_params.verdict);
-		if (tna_meta->ipt_params.verdict == 255)
-			return XDP_DROP;
-//#end of tnartr dependent 
-        
-        //#bridge dependent 
+		
+        //bridge dependent 
+		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
 		if (tna_meta->fdb_params.egress_ifindex > 0)
 			return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
+		else 
+			return bpf_redirect(fib_params.ifindex, 0);
 		}
         //#end of bridge dependent
         //need to add a non bridge dependent redirect (pure l3)
+		//return bpf_redirect(fib_params.ifindex, 0);
 	return 0;
 } 
 
