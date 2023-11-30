@@ -7,7 +7,7 @@ LLVM_STRIP ?= llvm-strip
 
 LIBBPF_SRC := $(abspath ../libbpf/src)
 BPFTOOL_SRC := $(abspath ../bpftool/src)
-TNAFPM_SRC := $(abspath ./fp_assembler)
+##TNAFPM_SRC := $(abspath ./fp_assembler)
 
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 BPFTOOL ?= $(abspath $(OUTPUT)/bpftool/bpftool)
@@ -21,7 +21,7 @@ INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I../com
 CXXFLAGS := -g -Wall
 
 TNAFP = tnafp
-TNAFPM = tnafpm
+#TNAFPM = tnafpm
 APP = tna
 
 CLANG_BPF_SYS_INCLUDES = $(shell $(CLANG) -v -E - </dev/null 2>&1 \
@@ -59,11 +59,12 @@ $(OUTPUT)/$(TNAFP).skel.h: $(OUTPUT)/$(TNAFP).bpf.o
 
 $(TNAFP): $(OUTPUT)/$(TNAFP).bpf.o $(OUTPUT)/$(TNAFP).skel.h
 
-$(TNAFPM):
-	make -C $(TNAFPM_SRC) all
+#$(TNAFPM):
+#	make -C $(TNAFPM_SRC) all
 
 # Build controller code
-$(APP): $(TNAFP) $(TNAFPM) | $(OUTPUT) $(LIBBPF_OBJ)
+#$(APP): $(TNAFP) $(TNAFPM) | $(OUTPUT) $(LIBBPF_OBJ)
+$(APP): $(TNAFP) | $(OUTPUT) $(LIBBPF_OBJ)
 	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -fpermissive -w -o $(BUILD_DIR)/$@
 
 # Generate vmlinux.h

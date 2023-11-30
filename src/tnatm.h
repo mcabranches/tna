@@ -37,12 +37,14 @@ class Tnatm {
         {
             cout << "Adding tnabr object to tnaodb" << endl;
             tnaodb.tnabr = tnabr;
+            fpms["tnabr"] = tnabr_fpm;
         }
 
         void add_tnartr(Tnartr *tnartr)
         {
             cout << "Adding tnartr object to tnaodb" << endl;
             tnaodb.tnartr = tnartr;
+            fpms["tnartr"] = tnartr_fpm;
         }
 
         void add_tnaipt(Tnaipt *tnaipt)
@@ -105,6 +107,9 @@ class Tnatm {
                     }
                 }
                 else {
+                   interfaces[i].xdp_set = 0;
+                    if (interfaces[i].type == "Null")
+                        interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnartr->update_tna_rtr(&tnaodb.tnaifs[interfaces[i].ifname]);
                     //cout << "interfaces[i].ifname: " << interfaces[i].ifname << endl;
@@ -126,15 +131,25 @@ class Tnatm {
         int deploy_tnafp(void)
         {
             cout << "Updating TNA fast path" << endl;
-            call_tnafpa();
-            tnafpd.deploy_tnafp(&tnaodb);
+            //30/11/2023 - make this go through bridges, routers, and ipvs
+            //If they have interfaces, do call_tnafpa(tnafpm) and then 
+            //call tnafpd.deploy_tnafp(&tnaodb)
+            //tnafpd.deploy_tnafp(&tnaodb) should be changed to process the different fast paths 
+            //ex: get each br or rtr, iterate on their interfaces and install the fp 
+            //maybe create one deployer for each fp and only call them when needed 
+            //if (tnaodb.tnartr->tnartr.rtrifs.count() > 1) {
+                call_tnafpa("tnartr");
+                tnafpd.deploy_tnafp(&tnaodb);
+            //}
             return 0; 
         }
 
     private:
         Tnafpd tnafpd = Tnafpd();
         hash<string> get_hash;
-        list<string> fpms, cfg;
+        //list<string> fpms, cfg;
+        list<string> cfg, tnabr_fpm, tnartr_fpm;
+        unordered_map<string, list<string>> fpms;
 
         int _update_tna_topo(void)
 		{
@@ -147,19 +162,20 @@ class Tnatm {
             unordered_map<string, struct tna_interface>::iterator if_it;
             unordered_map<string, struct tna_interface *>::iterator rtrif_it;
 
-            fpms.clear();
+            fpms["tnabr"].clear();
+            fpms["tnartr"].clear();
 
             //process bridges
             for (br_it = tnaodb.tnabr->tnabrs.begin(); br_it != tnaodb.tnabr->tnabrs.end(); ++br_it) {
                 if (br_it->second.brname != "") {
                     //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
-                    fpms.push_back("tnabr");
+                    fpms["tnabr"].push_back("tnabr");
 
                     if (br_it->second.has_l3) {
-                        fpms.push_back("tnartr");
+                        fpms["tnabr"].push_back("tnartr");
                         if (tnaodb.tnaipt->has_ipt()) {
                             br_it->second.has_ipt = 1;
-                            fpms.push_back("tnaipt");
+                            fpms["tnabr"].push_back("tnaipt");
                         }
                     }
                         
@@ -169,7 +185,7 @@ class Tnatm {
 
             //process router
             for (rtrif_it = tnaodb.tnartr->tnartr.rtrifs.begin(); rtrif_it != tnaodb.tnartr->tnartr.rtrifs.end(); ++rtrif_it) {
-                cout << "FOUND RTR IFACE: " << rtrif_it->second->ifname << endl;
+                fpms["tnartr"].push_back("tnartr");
                 tna_topo_add_rtr_config(tnaodb.tnartr->tnartr); //implement
             }
 
@@ -180,8 +196,8 @@ class Tnatm {
                 }
             }
 
-            tna_topo_add_fpm();
-            tna_topo_add_interfaces();
+            //tna_topo_add_fpm();
+            //tna_topo_add_interfaces();
             
             return 0;
 		}
@@ -194,7 +210,20 @@ class Tnatm {
             boost::property_tree::ptree child;
             string parent = "fpms";
 
-            for (it = fpms.begin(); it != fpms.end(); ++it) {
+            //process tnabr
+            for (it = fpms["tnabr"].begin(); it != fpms["tnabr"].end(); ++it) {
+                elements.put_value(*it);
+                child.push_back(make_pair("",elements));
+                cout << "elements "<< elements.data() << endl;
+                tna_topo.put_child(parent, child);
+                parent = it->c_str();
+            }
+
+            elements.clear();
+            child.clear();
+            
+            //process tnartr
+            for (it = fpms["tnartr"].begin(); it != fpms["tnartr"].end(); ++it) {
                 elements.put_value(*it);
                 child.push_back(make_pair("",elements));
                 tna_topo.put_child(parent, child);
@@ -314,16 +343,16 @@ class Tnatm {
             return changed;
         }
 
-        int call_tnafpa(void)
+        int call_tnafpa(std::string fpm)
         {
             std::stringstream ss;
             std::string pycmd;
 
             boost::property_tree::json_parser::write_json(ss, tna_topo);
 
-            pycmd = "cd ./src/fp_assembler && python3 tnasynth.py '" + ss.str() + "'";
+            pycmd = "cd ./src/fp_assembler && python3 tnasynth.py " + fpm + " '" + ss.str() + "'";
 
-            //cout << pycmd << endl;
+            cout << pycmd << endl;
 
             system(pycmd.c_str());
 

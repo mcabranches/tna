@@ -41,6 +41,7 @@ class Tnartr {
             if (interface->has_l3 && get_fwd_status()) {
                 cout << "Updating tnartr" << endl;
                 cout << "interface->ifname " <<  interface->ifname << endl;
+                //interface->ref_cnt += 1;
                 tnartr.rtrifs[interface->ifname] = interface;
             }
 

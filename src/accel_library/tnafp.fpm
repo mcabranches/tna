@@ -33,4 +33,8 @@ struct tna_meta_t {
 	struct bpf_ipt_lookup ipt_params;
 };
 
-{% include "tnabr.fpm" %}
+{% if "tnabr" in fpms['config']['fpm'] %}
+	{#% include "tnabr_ep.fpm" %#}
+{% elif "tnartr" in fpms['config']['fpm'] %}
+	{% include "tnartr_ep.fpm" %}
+{% endif %}

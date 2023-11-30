@@ -1,4 +1,4 @@
-{% if "tnartr" in fpms['tnabr'] %}
+{% if fpms['config']['tnabr']['has_l3'] == '1' %}
     {% include "tnartr.fpm" %} 
 {% endif %}
 
@@ -50,7 +50,7 @@ int tnabr(struct xdp_md* ctx)
 		return XDP_DROP;
 	}
 
-    {% if "tnartr" in fpms['tnabr'] %}
+    {% if "tnartr" in fpms['config']['tnabr'] %}
     //This should only be deployed if bridge vlan interfaces have IP addresses configured on them
     //Logic for detecting this goes in the "service introspection"
 	if (tna_meta.fdb_params.flags == 3 && nh_type == bpf_htons(ETH_P_IP)) {
