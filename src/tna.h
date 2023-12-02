@@ -56,7 +56,7 @@ namespace tna {
 
         if (event_flag & tna_g_ns::TNA_BR_EVENT) {
             cout << "TNA_BR_EVENT" << endl;
-            tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
+            //tnatm->tnaodb.tnabr->update_tna_bridge(&tnatm->tnaodb.tnaifs[ifs_entry.ifname]);
         }
 
         if (event_flag & tna_g_ns::TNA_RTR_EVENT) {

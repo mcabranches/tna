@@ -39,6 +39,8 @@ class Tnartr {
 
         int update_tna_rtr(struct tna_interface *interface)
         {
+            if (interface->type == "bridge")
+                return 1;
             cout << "Updating tnartr" << endl;
             if (interface->has_l3 && get_fwd_status()) {
                 cout << "interface->ifname " <<  interface->ifname << endl;
