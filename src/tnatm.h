@@ -20,6 +20,9 @@ class Tnatm {
         Tnatm(void)
         {
             cout << "Initializing Topology Manager" << endl;
+
+            tnafpd.load_bpf();
+            tnafpd.add_tna_fpd(&tnaodb);
         }
 
         ~Tnatm(void)
@@ -89,6 +92,7 @@ class Tnatm {
                     tnabridge.has_l3 = interfaces[i].has_l3; 
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnabr->add_tna_bridge(tnabridge);
+                    tnaodb.tnartr->has_tnabr = 1;
 
                     if (tnabridge.has_l3)
                         if (tnaodb.tnaipt->has_ipt())
@@ -131,6 +135,10 @@ class Tnatm {
         int deploy_tnafp(void)
         {
             cout << "Updating TNA fast path" << endl;
+            //unordered_map<string, struct tna_bridge>::iterator br_it;
+            //unordered_map<string, struct tna_interface *>::iterator if_it;
+            //unordered_map<string, struct tna_interface *>::iterator _if_it;
+
             //30/11/2023 - make this go through bridges, routers, and ipvs
             //If they have interfaces, do call_tnafpa(tnafpm) and then 
             //call tnafpd.deploy_tnafp(&tnaodb)
@@ -138,8 +146,40 @@ class Tnatm {
             //ex: get each br or rtr, iterate on their interfaces and install the fp 
             //maybe create one deployer for each fp and only call them when needed 
             //if (tnaodb.tnartr->tnartr.rtrifs.count() > 1) {
-                call_tnafpa("tnartr");
-                tnafpd.deploy_tnafp(&tnaodb);
+            
+            //update tna fp code
+            //12/04/2023 - need to check if there are bridges or rtrs configured before calling
+            call_tnafpa("tnabr");
+            call_tnafpa("tnartr");
+            //call_tnafpa("tnaipt")
+
+            // //process bridges
+            // for (br_it = tnaodb.tnabr->tnabrs.begin(); br_it != tnaodb.tnabr->tnabrs.end(); ++br_it) {
+
+            //     //process bridge interfaces
+            //     for (if_it = br_it->second.brifs.begin(); if_it !=  br_it->second.brifs.end(); ++if_it) {
+            //         if (if_it->second->op_state_str == "up") {
+            //             //tafpd.deploy_tnafp(if_it->second, "tnabr") //TODO: update this function
+            //             cout << "Installing tnabr" << endl;
+            //         }
+
+            //     } 
+
+            // }
+
+            // //process router interfaces (we have only one router)
+            // for (if_it = tnaodb.tnartr->tnartr.rtrifs.begin(); if_it != tnaodb.tnartr->tnartr.rtrifs.end(); ++if_it) {
+            //      if (if_it->second->op_state_str == "up") {
+            //         cout << "Installing tnartr" << endl;
+            //         //tafpd.deploy_tnafp(if_it->second, "tnartr") //TODO: update this function
+            //      }
+            // }
+
+            //process ipvs
+            //...
+            
+            //call_tnafpa("tnartr");
+            tnafpd.deploy_tnafp(&tnaodb);
             //}
             return 0; 
         }
@@ -186,7 +226,7 @@ class Tnatm {
             //process router
             for (rtrif_it = tnaodb.tnartr->tnartr.rtrifs.begin(); rtrif_it != tnaodb.tnartr->tnartr.rtrifs.end(); ++rtrif_it) {
                 fpms["tnartr"].push_back("tnartr");
-                tna_topo_add_rtr_config(tnaodb.tnartr->tnartr); //implement
+                tna_topo_add_rtr_config(tnaodb.tnartr->tnartr);
             }
 
             //process interfaces
@@ -304,7 +344,7 @@ class Tnatm {
             tna_topo.put(property_path, "1");
 
             property_path = "config.tnartr.has_tnabr"; //get this from tnaodb on "update_rtr"
-            tna_topo.put(property_path, "1");
+            tna_topo.put(property_path, tnaodb.tnartr->has_tnabr);
 
             property_path = "config.tnartr.has_ipt";
             tna_topo.put(property_path, "0");

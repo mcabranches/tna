@@ -251,6 +251,7 @@ class Tnanl {
 
             if (ifs_entry->ifindex == ifs_entry->master_index) {
                 ifs_entry->type = "bridge";
+                tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
             }
 
             if (if_info->ifi_flags && if_info->ifi_change) {
@@ -271,7 +272,7 @@ class Tnanl {
                 ifs_entry->tna_event_type = 0;
 
             
-            tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
+            //tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
         }
 
         void parse_ifa(struct nlmsghdr* nlh, struct ifinfomsg* if_info, 

@@ -34,7 +34,7 @@ struct tna_meta_t {
 };
 
 {% if "tnabr" in fpms['config']['fpm'] %}
-	{#% include "tnabr_ep.fpm" %#}
+	{% include "tnabr_ep.fpm" %}
 {% elif "tnartr" in fpms['config']['fpm'] %}
 	{% include "tnartr_ep.fpm" %}
 {% endif %}

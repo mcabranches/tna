@@ -21,10 +21,19 @@
 #include <mutex>
 #include <net/if.h>
 #include <fstream>
+#include <bpf/bpf.h>
 
 
 using namespace std;
 
+struct tna_fpd {
+	struct bpf_prog_load_attr fpm_prog_load_attr;
+	struct bpf_object *fpm_bpf_obj;
+	struct bpf_program *fpm_bpf_prog;
+	struct bpf_map *fpm_dev_map; 
+	int fpm_dev_map_fd = 0;
+	int fpm_fd = 0;	
+};
 
 struct tna_vlan {
 	int vid;
@@ -58,6 +67,7 @@ struct Tnaodb {
 	class Tnaipt *tnaipt;
 	//add other objects
 	unordered_map <string, struct tna_interface> tnaifs;
+	unordered_map <string, struct tna_fpd*> tnafpd;
 	set<string> ignore_ifs;
 };
 

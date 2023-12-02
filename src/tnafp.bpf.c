@@ -4,9 +4,9 @@
 SEC("xdptna")
 int xdp_tna_main_0(struct xdp_md* ctx) {
 
-	bpf_tail_call(ctx, &jmp_table, 0);
+	bpf_tail_call(ctx, &jmp_table, ctx->ingress_ifindex);
 
-	return XDP_PASS;
+	return XDP_DROP;
 }
 
 char _license[] SEC("license") = "GPL";

@@ -16,6 +16,8 @@ if (len(tnafp.keys()) > 0):
 
     tnafp['config']['fpm'] = fpm
 
+
+    print("AAAAAAAAAAAAAAAAAAAAAAAAA")
     print(tnafp)
 
     content = template.render(fpms=tnafp)

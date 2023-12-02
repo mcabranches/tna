@@ -25,6 +25,7 @@ class Tnartr {
 
         struct tna_rtr tnartr; //just one per box
         int num_interfaces;
+        int has_tnabr = 0;
 
         // int add_tna_rtr(struct tna_rtr tnartr) 
 		// {
@@ -38,11 +39,17 @@ class Tnartr {
 
         int update_tna_rtr(struct tna_interface *interface)
         {
+            cout << "Updating tnartr" << endl;
             if (interface->has_l3 && get_fwd_status()) {
-                cout << "Updating tnartr" << endl;
                 cout << "interface->ifname " <<  interface->ifname << endl;
-                //interface->ref_cnt += 1;
+                interface->ref_cnt += 1;
                 tnartr.rtrifs[interface->ifname] = interface;
+            }
+
+            if (!interface->has_l3) {
+                cout << "removing interface from tnartr" << endl;
+                interface->ref_cnt -= 1;
+                tnartr.rtrifs.erase(interface->ifname);
             }
 
             return 0;
