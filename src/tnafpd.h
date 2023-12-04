@@ -17,19 +17,12 @@ class Tnafpd {
 				throw std::invalid_argument("tnafpd: invalid xdp flags");
 			else
 				_flags = flags;
-
-			//load_bpf(struct Tnaodb *tnaodb);
 		}
 
 		Tnafpd(void)
 		{
-		 	//load_bpf();
+			cout << "Initializing tnafpd" << endl;
 		}
-
-		// ~Tnafpd(void) 
-		// {
-		// 	destroy_tnafp();
-        // }
 
 		int load_bpf() 
 		{
@@ -54,7 +47,6 @@ class Tnafpd {
 				return 0;
 		}
 
-		//int load_bpf_fpm(void)
 		int load_bpf_fpm(struct tna_fpd *_tna_fpd, string fpm)
 		{
 
@@ -76,7 +68,6 @@ class Tnafpd {
 
 			_tna_fpd->fpm_dev_map_fd = bpf_map__fd(_tna_fpd->fpm_dev_map);
 
-			cout << "_tna_fpd->fpm_dev_map_fd " << _tna_fpd->fpm_dev_map_fd << endl;
 			return 0;
 
 		}
@@ -101,9 +92,7 @@ class Tnafpd {
 
                 //process bridge interfaces
                 for (if_it = br_it->second.brifs.begin(); if_it !=  br_it->second.brifs.end(); ++if_it) {
-                    if (if_it->second->op_state_str == "up") {
-                        //tafpd.deploy_tnafp(if_it->second, "tnabr") //TODO: update this function
-                        
+                    if (if_it->second->op_state_str == "up") {                        
 						cout << "Installing tnabr" << endl;
 						if ((!if_it->second->xdp_set) && (if_it->second->ref_cnt > 0)) {
 		 					install_tnafp(if_it->second);
@@ -118,35 +107,16 @@ class Tnafpd {
 
             //process router interfaces (we have only one router)
             for (if_it = tnaodb->tnartr->tnartr.rtrifs.begin(); if_it != tnaodb->tnartr->tnartr.rtrifs.end(); ++if_it) {
-                 if (if_it->second->op_state_str == "up") {
-					 //tafpd.deploy_tnafp(if_it->second, "tnartr") //TODO: update this function
-				   
+                 if (if_it->second->op_state_str == "up") {				   
 				    cout << "Installing tnartr" << endl;
 					if ((!if_it->second->xdp_set) && (if_it->second->ref_cnt > 0)) {
 						install_tnafp(if_it->second);
 						load_bpf_fpm(tnaodb->tnafpd["tnartr"], "tnartr");
 						deploy_tnafpm(tnaodb->tnafpd["tnartr"], if_it->second);
 					}
-                    //tafpd.deploy_tnafp(if_it->second, "tnartr") //TODO: update this function
-
                  }
             }
 
-			// unordered_map<string, struct tna_interface>::iterator it;
-			// int idx;
-			//load_bpf_fpm(&tnaodb->tnafpd["tnabr"]);
-			//load_bpf_fpm(&tnaodb->tnafpd["tnartr"]);
-			//load_bpf_fpm(&tnaodb->tnafpd["tnaipt"]);
-			// deploy_tnafpm();
-
-			// for (it = tnaodb->tnaifs.begin(); it != tnaodb->tnaifs.end(); ++it) {
-			// 	if ((!it->second.xdp_set) && (it->second.ref_cnt > 0)) {
-			// 		install_tnafp(&it->second);
-			// 	}
-			// 	if (it->second.ref_cnt > 0)
-			// 		if (bpf_map_update_elem(fpm_dev_map_fd, &it->second.ifindex, &it->second.ifindex, BPF_ANY) < 0)
-			// 			cout << "Could not update tx_port map contents ... " << endl;
-			// }
 			return 0;
 		}
 
@@ -218,15 +188,6 @@ class Tnafpd {
 		int _ifindex;
 		int _flags = XDP_FLAGS_SKB_MODE; /* default */
 		int map_fd;
-		// struct bpf_prog_load_attr fpm_prog_load_attr = {
-		// 	.file = "./build/.output/tnafpm.bpf.o",
-		// 	.prog_type = BPF_PROG_TYPE_XDP
-		// };
-		// struct bpf_object *fpm_bpf_obj = nullptr;
-		// struct bpf_program *fpm_bpf_prog;
-		// struct bpf_map *fpm_dev_map;
-		// int fpm_dev_map_fd = 0;
-		// int fpm_fd = 0;	
 		struct tna_fpd tna_fpd_tnartr;
 		struct tna_fpd tna_fpd_tnabr;
 		/* struct tna_fpd tna_fpd_tnaipvs; */
@@ -235,7 +196,6 @@ class Tnafpd {
 		{
 			tnaodb->tnafpd["tnabr"] = &tna_fpd_tnabr;
 			tnaodb->tnafpd["tnartr"] = &tna_fpd_tnartr;
-			/* tnaodb->tnafpd["tnaipvs"] = &tna_fpd_tnaipvs; */
 
 			//init tnabr fpd
 			tnaodb->tnafpd["tnabr"]->fpm_prog_load_attr = {

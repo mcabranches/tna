@@ -27,29 +27,17 @@ class Tnartr {
         int num_interfaces;
         int has_tnabr = 0;
 
-        // int add_tna_rtr(struct tna_rtr tnartr) 
-		// {
-		// 	tnartrs[num_rtrs] = tnartr;
-		// 	//tnabrs[tnabridge.brname].brifs.clear();
-
-		// 	cout << "Created tna rtr: " << endl;
-
-		// 	return 0;
-		// }
-
         int update_tna_rtr(struct tna_interface *interface)
         {
             if (interface->type == "bridge")
                 return 1;
-            cout << "Updating tnartr" << endl;
+            //cout << "Updating tnartr" << endl;
             if (interface->has_l3 && get_fwd_status()) {
-                cout << "interface->ifname " <<  interface->ifname << endl;
                 interface->ref_cnt += 1;
                 tnartr.rtrifs[interface->ifname] = interface;
             }
 
             if (!interface->has_l3) {
-                cout << "removing interface from tnartr" << endl;
                 interface->ref_cnt -= 1;
                 tnartr.rtrifs.erase(interface->ifname);
             }

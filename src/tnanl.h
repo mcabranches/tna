@@ -156,7 +156,7 @@ class Tnanl {
             self->build_nl_cache();
             self->get_cached_interface(&ifs_entry);
 
-            cout << "ifs_entry.ifname: " << ifs_entry.ifname << endl;
+            //cout << "ifs_entry.ifname: " << ifs_entry.ifname << endl;
 
             if (nlmsg_type == RTM_NEWLINK || nlmsg_type == RTM_DELLINK) 
                 self->parse_ifla(nlh, if_info, &ifs_entry, &tna_event, self);
@@ -272,7 +272,7 @@ class Tnanl {
                 ifs_entry->tna_event_type = 0;
 
             
-            //tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
+            tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
         }
 
         void parse_ifa(struct nlmsghdr* nlh, struct ifinfomsg* if_info, 
@@ -298,12 +298,12 @@ class Tnanl {
                     ifs_entry->has_l3 = 1;
                     self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].has_l3 = 1;
                     tna_event->event_flag |= tna_g_ns::TNA_RTR_EVENT;
-                    cout << "ifname: " << ifs_entry->ifname;
                 }
             }
             else if ((int) nlh->nlmsg_type == RTM_DELADDR) {
                 ifs_entry->has_l3 = 0;
                 self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].has_l3 = 0;
+                tna_event->event_flag |= tna_g_ns::TNA_RTR_EVENT;
             }
 
             if ((self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].master_index != 0)

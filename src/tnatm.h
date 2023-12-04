@@ -116,9 +116,6 @@ class Tnatm {
                         interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnartr->update_tna_rtr(&tnaodb.tnaifs[interfaces[i].ifname]);
-                    //cout << "interfaces[i].ifname: " << interfaces[i].ifname << endl;
-                    //cout << "interfaces[i].has_l3: " << interfaces[i].has_l3 << endl;
-
                 }
             }
         }
@@ -134,60 +131,20 @@ class Tnatm {
 
         int deploy_tnafp(void)
         {
-            cout << "Updating TNA fast path" << endl;
-            //unordered_map<string, struct tna_bridge>::iterator br_it;
-            //unordered_map<string, struct tna_interface *>::iterator if_it;
-            //unordered_map<string, struct tna_interface *>::iterator _if_it;
+            cout << "Updating TNA fast path" << endl;    
 
-            //30/11/2023 - make this go through bridges, routers, and ipvs
-            //If they have interfaces, do call_tnafpa(tnafpm) and then 
-            //call tnafpd.deploy_tnafp(&tnaodb)
-            //tnafpd.deploy_tnafp(&tnaodb) should be changed to process the different fast paths 
-            //ex: get each br or rtr, iterate on their interfaces and install the fp 
-            //maybe create one deployer for each fp and only call them when needed 
-            //if (tnaodb.tnartr->tnartr.rtrifs.count() > 1) {
-            
             //update tna fp code
-            //12/04/2023 - need to check if there are bridges or rtrs configured before calling
             call_tnafpa("tnabr");
             call_tnafpa("tnartr");
-            //call_tnafpa("tnaipt")
+            //call_tnafpa("tnaipvs")
 
-            // //process bridges
-            // for (br_it = tnaodb.tnabr->tnabrs.begin(); br_it != tnaodb.tnabr->tnabrs.end(); ++br_it) {
-
-            //     //process bridge interfaces
-            //     for (if_it = br_it->second.brifs.begin(); if_it !=  br_it->second.brifs.end(); ++if_it) {
-            //         if (if_it->second->op_state_str == "up") {
-            //             //tafpd.deploy_tnafp(if_it->second, "tnabr") //TODO: update this function
-            //             cout << "Installing tnabr" << endl;
-            //         }
-
-            //     } 
-
-            // }
-
-            // //process router interfaces (we have only one router)
-            // for (if_it = tnaodb.tnartr->tnartr.rtrifs.begin(); if_it != tnaodb.tnartr->tnartr.rtrifs.end(); ++if_it) {
-            //      if (if_it->second->op_state_str == "up") {
-            //         cout << "Installing tnartr" << endl;
-            //         //tafpd.deploy_tnafp(if_it->second, "tnartr") //TODO: update this function
-            //      }
-            // }
-
-            //process ipvs
-            //...
-            
-            //call_tnafpa("tnartr");
             tnafpd.deploy_tnafp(&tnaodb);
-            //}
             return 0; 
         }
 
     private:
         Tnafpd tnafpd = Tnafpd();
         hash<string> get_hash;
-        //list<string> fpms, cfg;
         list<string> cfg, tnabr_fpm, tnartr_fpm;
         unordered_map<string, list<string>> fpms;
 
@@ -235,9 +192,6 @@ class Tnatm {
                     tnafpd.uninstall_tnafp(&if_it->second);
                 }
             }
-
-            //tna_topo_add_fpm();
-            //tna_topo_add_interfaces();
             
             return 0;
 		}
@@ -254,7 +208,6 @@ class Tnatm {
             for (it = fpms["tnabr"].begin(); it != fpms["tnabr"].end(); ++it) {
                 elements.put_value(*it);
                 child.push_back(make_pair("",elements));
-                cout << "elements "<< elements.data() << endl;
                 tna_topo.put_child(parent, child);
                 parent = it->c_str();
             }
@@ -391,8 +344,6 @@ class Tnatm {
             boost::property_tree::json_parser::write_json(ss, tna_topo);
 
             pycmd = "cd ./src/fp_assembler && python3 tnasynth.py " + fpm + " '" + ss.str() + "'";
-
-            cout << pycmd << endl;
 
             system(pycmd.c_str());
 
