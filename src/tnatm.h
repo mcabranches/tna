@@ -101,7 +101,7 @@ class Tnatm {
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
                          if (interfaces[i].master_index == master_index) {
-                            interfaces[i].xdp_set = 0;
+                            interfaces[i].fpm_set = 0;
                             if (interfaces[i].type == "Null")
                                 interfaces[i].type = "phys";
                             
@@ -111,7 +111,7 @@ class Tnatm {
                     }
                 }
                 else {
-                   interfaces[i].xdp_set = 0;
+                   interfaces[i].fpm_set = 0;
                     if (interfaces[i].type == "Null")
                         interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
@@ -151,8 +151,10 @@ class Tnatm {
         int _update_tna_topo(void)
 		{
 			cout << "Updating TNA topology" << endl;
+            string property_path = "config.dp_type";
             prev_tna_topo = tna_topo;
             tna_topo.clear();
+            tna_topo.put(property_path, tnafpd.get_fpm_hook());
 
             tna_interface interface;
             unordered_map<string, struct tna_bridge>::iterator br_it;

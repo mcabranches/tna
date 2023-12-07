@@ -23,6 +23,7 @@ namespace tna {
         int event_type;
         int event_flag;
 
+        //Event queue
         pthread_mutex_lock(&tna_g_ns::m1);
         while (tna_g_ns::tna_event_q.empty())
             pthread_cond_wait(&tna_g_ns::cv1, &tna_g_ns::m1);
@@ -43,7 +44,7 @@ namespace tna {
             ifs_entry_tmp = tnatm->tnaodb.tnaifs[ifs_entry.ifname];
             tnatm->tnaodb.tnaifs[ifs_entry.ifname] = ifs_entry;
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].ref_cnt = ifs_entry_tmp.ref_cnt;
-            tnatm->tnaodb.tnaifs[ifs_entry.ifname].xdp_set = ifs_entry_tmp.xdp_set;
+            tnatm->tnaodb.tnaifs[ifs_entry.ifname].fpm_set = ifs_entry_tmp.fpm_set;
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].tna_svcs = ifs_entry_tmp.tna_svcs;
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].type = ifs_entry_tmp.type;
             //tnatm->tnaodb.tnaifs[ifs_entry.ifname].op_state = ifs_entry_tmp.op_state;
@@ -51,7 +52,7 @@ namespace tna {
         else {
             tnatm->tnaodb.tnaifs[ifs_entry.ifname] = ifs_entry;
             tnatm->tnaodb.tnaifs[ifs_entry.ifname].ref_cnt = 0;
-            tnatm->tnaodb.tnaifs[ifs_entry.ifname].xdp_set = 0;
+            tnatm->tnaodb.tnaifs[ifs_entry.ifname].fpm_set = 0;
         }
 
         if (event_flag & tna_g_ns::TNA_BR_EVENT) {

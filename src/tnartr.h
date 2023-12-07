@@ -38,8 +38,11 @@ class Tnartr {
             }
 
             if (!interface->has_l3) {
-                interface->ref_cnt -= 1;
-                tnartr.rtrifs.erase(interface->ifname);
+                //interface->ref_cnt -= 1;
+                
+                if (tnartr.rtrifs.erase(interface->ifname))
+                    interface->ref_cnt -= 1;
+
             }
 
             return 0;

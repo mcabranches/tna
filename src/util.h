@@ -23,6 +23,8 @@
 #include <fstream>
 #include <bpf/bpf.h>
 
+#define FPM_XDP 0
+#define FPM_TC 1 
 
 using namespace std;
 
@@ -44,7 +46,7 @@ struct tna_interface {
 	int ifindex;
 	int master_index;
 	int is_veth;
-	int xdp_set;
+	int fpm_set;
 	int tna_event_type; //m-> topology manager should use this (see old update_tna_bridge - tnanl.h)
 	int has_vlan;
 	int has_l3;
@@ -157,8 +159,50 @@ namespace util {
 		    printf("XDP program loaded\n");
 	    }
 
-	return 0;
+		return 0;
     }
+
+	static int uninstall_tc(int ifindex, int tc_flags)
+    {
+		DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_hook, .ifindex = ifindex,
+			    .attach_point = BPF_TC_INGRESS);
+		DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_opts, .handle = 1, .priority = 1);
+		int err;
+
+		tc_opts.flags = tc_opts.prog_fd = tc_opts.prog_id = 0;
+	    err = bpf_tc_detach(&tc_hook, &tc_opts);
+
+		if (err) {
+			printf("Failed to dettach TC");
+		}
+
+		bpf_tc_hook_destroy(&tc_hook);
+
+	    return 1;
+	}
+
+	static int install_tc(struct bpf_program *tc_prog, int ifindex, int tc_flags)
+    {
+		DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_hook, .ifindex = ifindex,
+			    .attach_point = BPF_TC_INGRESS);
+		DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_opts, .handle = 1, .priority = 1);
+
+		int err;
+	    int bpf_prog_fd = bpf_program__fd(tc_prog);
+
+		bpf_tc_hook_create(&tc_hook);
+
+		tc_opts.prog_fd = bpf_program__fd(tc_prog);
+		tc_opts.flags = 0;
+
+		err = bpf_tc_attach(&tc_hook, &tc_opts);
+		if (err) {
+			printf("Failed to attach TC");
+		}
+
+		return 0;
+    }
+
 }
 
 #endif

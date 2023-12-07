@@ -12,7 +12,7 @@ static void unload_prog(int sig) {
     return;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     cout << "\n#### TNA ####\n\n";
     cout <<"\nStarting TNA controller ...\n\n";
