@@ -125,7 +125,8 @@ class Tnatm {
                     }
                 }
                 else {
-                   interfaces[i].fpm_set = 0;
+                    interfaces[i].fpm_set = 0;
+                    interfaces[i].ref_cnt = tnaodb.tnaifs[interfaces[i].ifname].ref_cnt;
                     if (interfaces[i].type == "Null")
                         interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
