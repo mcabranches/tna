@@ -25,7 +25,7 @@ class Tnafpd {
 		Tnafpd(void)
 		{
 			cout << "Initializing tnafpd" << endl;
-			_fpm_hook = FPM_TC; //default
+			_fpm_hook = FPM_XDP; //default
 		}
 
 		int set_dp_type(string dp_type) 

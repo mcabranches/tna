@@ -68,7 +68,7 @@ class Tnabr {
 
 			tnabrs[tnabridge.brname].brifs[tnainterface->ifname] =  tnainterface; //push_back(tnainterface);
 			tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->fpm_set = 0;
-			//tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->ref_cnt += 1;			
+			tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->ref_cnt += 1;			
 
 			update_br_ifs_info();
 			tnabrs[tnabridge.brname].stp_enabled = get_stp_status(tnabridge.brname);

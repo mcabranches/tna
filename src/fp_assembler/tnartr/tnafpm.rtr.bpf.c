@@ -64,8 +64,8 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 }
 
 SEC("TNAFPM")
-int tnartr(struct xdp_md* ctx)
 
+int tnartr(struct __sk_buff *ctx)
 {
 	int rc;
 	void *data_end = (void *)(long)ctx->data_end;
@@ -91,16 +91,16 @@ int tnartr(struct xdp_md* ctx)
 	tna_meta.vlh = (void *)(tna_meta.eth + 1);
 
 	if (tna_meta.vlh + 1 > data_end)
-				return XDP_DROP;
-					
+						return TC_ACT_SHOT;
+			
 	tna_meta.fdb_params.vid = 0;
 	struct bpf_fib_lookup fib_params = {0};
 
 	tna_meta.iph = nh.pos;
 
 	if (tna_meta.iph + 1 > data_end)
-				return XDP_DROP;
-				
+						return TC_ACT_SHOT;
+		
 
 	fib_params.family	= AF_INET;
 	fib_params.tos		= tna_meta.iph->tos;
@@ -121,20 +121,15 @@ int tnartr(struct xdp_md* ctx)
 
 		if (!(tna_meta.eth)) {
 			//bpf_debug("Here4");
-						return XDP_DROP;
-						 
+									return TC_ACT_SHOT;
+			 
 		}
 
 	 	__builtin_memcpy(tna_meta.eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta.eth->h_source, fib_params.smac, ETH_ALEN);
 		
     	//#bridge/vlan dependent
-					 	tna_meta.fdb_params.vid = fib_params.h_vlan_TCI;
-
-		tna_meta.fdb_params.ifindex = fib_params.ifindex;
-        
-	 	bpf_fdb_lookup(ctx, &tna_meta.fdb_params, sizeof(tna_meta.fdb_params), tna_meta.eth->h_source, tna_meta.eth->h_dest);
-				
+						
         //end of bridge/vlan dependent
 
         //bridge dependent 
@@ -144,8 +139,8 @@ int tnartr(struct xdp_md* ctx)
     //end of bridge dependent
 
     //need to add a non bridge dependent redirect (pure l3)
-		return XDP_PASS;
-			
+			return TC_ACT_OK;
+		
 } 
 
 char _license[] SEC("license") = "GPL";
