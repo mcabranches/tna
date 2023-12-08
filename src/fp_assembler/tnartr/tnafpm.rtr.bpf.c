@@ -64,8 +64,8 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 }
 
 SEC("TNAFPM")
+int tnartr(struct xdp_md* ctx)
 
-int tnartr(struct __sk_buff *ctx)
 {
 	int rc;
 	void *data_end = (void *)(long)ctx->data_end;
@@ -91,16 +91,16 @@ int tnartr(struct __sk_buff *ctx)
 	tna_meta.vlh = (void *)(tna_meta.eth + 1);
 
 	if (tna_meta.vlh + 1 > data_end)
-						return TC_ACT_SHOT;
-			
+				return XDP_DROP;
+					
 	tna_meta.fdb_params.vid = 0;
 	struct bpf_fib_lookup fib_params = {0};
 
 	tna_meta.iph = nh.pos;
 
 	if (tna_meta.iph + 1 > data_end)
-						return TC_ACT_SHOT;
-		
+				return XDP_DROP;
+				
 
 	fib_params.family	= AF_INET;
 	fib_params.tos		= tna_meta.iph->tos;
@@ -121,8 +121,8 @@ int tnartr(struct __sk_buff *ctx)
 
 		if (!(tna_meta.eth)) {
 			//bpf_debug("Here4");
-									return TC_ACT_SHOT;
-			 
+						return XDP_DROP;
+						 
 		}
 
 	 	__builtin_memcpy(tna_meta.eth->h_dest, fib_params.dmac, ETH_ALEN);
@@ -144,8 +144,8 @@ int tnartr(struct __sk_buff *ctx)
     //end of bridge dependent
 
     //need to add a non bridge dependent redirect (pure l3)
-			return TC_ACT_OK;
-		
+		return XDP_PASS;
+			
 } 
 
 char _license[] SEC("license") = "GPL";

@@ -116,7 +116,7 @@ class Tnafpd {
                 for (if_it = br_it->second.brifs.begin(); if_it !=  br_it->second.brifs.end(); ++if_it) {
                     if (if_it->second->op_state_str == "up") {                        
 						cout << "Installing tnabr" << endl;
-						if ((!if_it->second->fpm_set) && (if_it->second->ref_cnt > 0)) {
+						if ((!tnaodb->tnaifs[if_it->second->ifname].fpm_set) && (tnaodb->tnaifs[if_it->second->ifname].ref_cnt > 0)) {
 		 					install_tnafp(if_it->second);
 							load_bpf_fpm(tnaodb->tnafpd["tnabr"], "tnabr");
 							deploy_tnafpm(tnaodb->tnafpd["tnabr"], if_it->second);
@@ -131,7 +131,7 @@ class Tnafpd {
             for (if_it = tnaodb->tnartr->tnartr.rtrifs.begin(); if_it != tnaodb->tnartr->tnartr.rtrifs.end(); ++if_it) {
                  if (if_it->second->op_state_str == "up") {				   
 				    cout << "Installing tnartr" << endl;
-					if ((!if_it->second->fpm_set) && (if_it->second->ref_cnt > 0)) {
+					if ((!tnaodb->tnaifs[if_it->second->ifname].fpm_set) && (tnaodb->tnaifs[if_it->second->ifname].ref_cnt > 0)) {
 						install_tnafp(if_it->second);
 						load_bpf_fpm(tnaodb->tnafpd["tnartr"], "tnartr");
 						deploy_tnafpm(tnaodb->tnafpd["tnartr"], if_it->second);

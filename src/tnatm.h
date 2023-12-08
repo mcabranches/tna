@@ -120,6 +120,7 @@ class Tnatm {
                             
                             tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                             tnaodb.tnabr->add_if_tna_bridge(tnabridge, &tnaodb.tnaifs[interfaces[i].ifname]);
+                            tnaodb.tnaifs[interfaces[i].ifname].ref_cnt += 1;
                          }
                     }
                 }
@@ -332,7 +333,6 @@ class Tnatm {
                 subtree.push_back(make_pair("",elements));
             }
             tna_topo.add_child(property_path, subtree);
-            cout << "Here..." << endl;
         }
 
 

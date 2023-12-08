@@ -45,7 +45,7 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 	return --iph->ttl;
 }
 
-static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta)
+static __always_inline tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_meta)
 {
 	int rc;
 	struct bpf_fib_lookup fib_params = {0};
@@ -85,8 +85,8 @@ static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta
 						//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
 		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
 		if (tna_meta->fdb_params.egress_ifindex > 0)
-							return bpf_redirect(tna_meta->fdb_params.egress_ifindex, 0);
-				else 
+					return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
+						else 
 			return bpf_redirect(fib_params.ifindex, 0);
 		}
 						
@@ -99,8 +99,8 @@ static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta
 
 
 SEC("TNAFPM")
+int tnabr(struct xdp_md* ctx)
 
-int tnabr(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
@@ -135,16 +135,16 @@ int tnabr(struct __sk_buff *ctx)
 		//Is it possible to see if the port is untagged via the helper?
 		//if (tna_meta.fdb_params.egress_ifindex == 5)
 		//	vlan_tag_pop(ctx, tna_meta.eth);
-							return bpf_redirect(tna_meta.fdb_params.egress_ifindex, 0);
-			}
+					return bpf_redirect_map(&tx_port, tna_meta.fdb_params.egress_ifindex, 0);
+					}
 
 	if (tna_meta.fdb_params.flags == 0) { //STP learning
-						return TC_ACT_OK;
-			}
+				return XDP_PASS;
+					}
 
 	if (tna_meta.fdb_params.flags == 2) { //STP blocked
-						return TC_ACT_SHOT;
-			}
+				return XDP_DROP;
+					}
 
 		
 	//This should only be deployed if bridge vlan interfaces have IP addresses configured on them
@@ -154,18 +154,18 @@ int tnabr(struct __sk_buff *ctx)
 		tna_meta.iph = nh.pos;
 
 		if (tna_meta.iph + 1 > data_end)
-									return TC_ACT_SHOT;
-			
+						return XDP_DROP;
+						
 		tna_meta.vlh = (void *)(tna_meta.eth + 1);
 
 		if (tna_meta.vlh + 1 > data_end)
-									return TC_ACT_SHOT;
-			    
+						return XDP_DROP;
+						    
 
 		return tnartr(ctx, &tna_meta);
 	}
         
-			return TC_ACT_OK;
-	}
+		return XDP_PASS;
+		}
 
 char _license[] SEC("license") = "GPL";
