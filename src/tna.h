@@ -100,6 +100,10 @@ namespace tna {
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
 
+        if (vm.count("help")) {
+            cout << desc << endl;
+        }
+
         return vm;
     }
 
