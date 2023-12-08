@@ -72,7 +72,7 @@ $(TNAFPTC): $(OUTPUT)/$(TNAFPTC).bpf.o $(OUTPUT)/$(TNAFPTC).skel.h
 
 
 $(APP): $(TNAFP) $(TNAFPTC) | $(OUTPUT) $(LIBBPF_OBJ)
-	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -fpermissive -w -o $(BUILD_DIR)/$@
+	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -lboost_program_options -fpermissive -w -o $(BUILD_DIR)/$@
 
 # Generate vmlinux.h
 $(VMLINUX): $(VMLINUX_DIR) $(BPFTOOL) $(APP)

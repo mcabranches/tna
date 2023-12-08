@@ -21,8 +21,6 @@ class Tnatm {
         {
             cout << "Initializing Topology Manager" << endl;
 
-            tnafpd.load_bpf();
-            tnafpd.add_tna_fpd(&tnaodb);
         }
 
         ~Tnatm(void)
@@ -35,6 +33,21 @@ class Tnatm {
         Tnaodb tnaodb;
         boost::property_tree::ptree tna_topo;
         boost::property_tree::ptree prev_tna_topo;
+
+        int set_dp_type(string dp_type)
+        {
+            return tnafpd.set_dp_type(dp_type);
+        }
+
+        int load_bpf(void)
+        {
+            return tnafpd.load_bpf();
+        }
+
+        void add_tna_fpd(void)
+        {
+            tnafpd.add_tna_fpd(&tnaodb);
+        }
 
         void add_tnabr(Tnabr *tnabr) 
         {
@@ -159,7 +172,7 @@ class Tnatm {
             tna_interface interface;
             unordered_map<string, struct tna_bridge>::iterator br_it;
             unordered_map<string, struct tna_interface>::iterator if_it;
-            unordered_map<string, struct tna_interface *>::iterator rtrif_it;
+            unordered_map<string, struct tna_rtr *>::iterator rtr_it;
 
             fpms["tnabr"].clear();
             fpms["tnartr"].clear();
@@ -183,7 +196,7 @@ class Tnatm {
             }
 
             //process router
-            for (rtrif_it = tnaodb.tnartr->tnartr.rtrifs.begin(); rtrif_it != tnaodb.tnartr->tnartr.rtrifs.end(); ++rtrif_it) {
+            if (tnaodb.tnartr) {
                 fpms["tnartr"].push_back("tnartr");
                 tna_topo_add_rtr_config(tnaodb.tnartr->tnartr);
             }
@@ -319,6 +332,7 @@ class Tnatm {
                 subtree.push_back(make_pair("",elements));
             }
             tna_topo.add_child(property_path, subtree);
+            cout << "Here..." << endl;
         }
 
 

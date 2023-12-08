@@ -12,8 +12,12 @@
 #include "tnabr.h"
 #include "tnaipt.h"
 #include "tnafpd.h"
+#include <iostream>
+#include <boost/program_options.hpp>
 
 namespace tna {
+
+    namespace po = boost::program_options;
 
     int process_tna_event(Tnanl *tnanl, Tnatm *tnatm)
     {
@@ -81,6 +85,48 @@ namespace tna {
         pthread_mutex_unlock(&tna_g_ns::m1);
 
         return 0;
+    }
+
+    po::variables_map get_cl_options(int argc, char *argv[])
+    {
+        po::options_description desc("Allowed options");
+        desc.add_options()
+              ("help", "produce help message")
+              ("dp", po::value<string>(), "set data plane type <xdp (skb default), xdp_drv or tc>")
+              ("ignore-ifaces", po::value<string>(), "exclude list of interfaces from tna. Ex: lo,enp0s3")
+        ;
+
+        po::variables_map vm;
+        po::store(po::parse_command_line(argc, argv, desc), vm);
+        po::notify(vm);
+
+        return vm;
+    }
+
+    void init_tna_fp(Tnatm *tnatm, po::variables_map vm)
+    {
+
+        if (vm.count("dp")) {
+            tnatm->set_dp_type(vm["dp"].as<string>());
+        }
+
+        if (vm.count("ignore-ifaces")) {
+
+            std::stringstream ss(vm["ignore-ifaces"].as<string>());
+            std::vector<string> v;
+
+            while (ss.good()) {
+                string substr;
+                getline(ss, substr, ',');
+                v.push_back(substr);
+            }
+    
+            for (size_t i = 0; i < v.size(); i++) {
+                cout << "Ignoring iface " << v[i] << endl;
+                tnatm->tnaodb.ignore_ifs.insert(v[i]);
+
+            }
+        }
     }
 
 }

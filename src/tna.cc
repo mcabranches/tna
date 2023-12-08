@@ -14,6 +14,11 @@ static void unload_prog(int sig) {
 
 int main(int argc, char *argv[])
 {
+    po::variables_map vm = get_cl_options(argc, argv);
+
+    if (vm.count("help"))
+        return 0;
+
     cout << "\n#### TNA ####\n\n";
     cout <<"\nStarting TNA controller ...\n\n";
 
@@ -23,6 +28,11 @@ int main(int argc, char *argv[])
     Tnanl tnanl = Tnanl();
     Tnatm tnatm = Tnatm();
 
+    init_tna_fp(&tnatm, vm);
+
+    tnatm.add_tna_fpd();
+    tnatm.load_bpf();
+
     Tnabr tnabr = Tnabr();
     tnatm.add_tnabr(&tnabr);
 
@@ -31,9 +41,6 @@ int main(int argc, char *argv[])
 
     Tnaipt tnaipt = Tnaipt();
     tnatm.add_tnaipt(&tnaipt);
-
-    tnatm.tnaodb.ignore_ifs.insert("lo");
-    tnatm.tnaodb.ignore_ifs.insert("enp0s3");
 
     tnanl.init_tna_objects(&tnatm);
     

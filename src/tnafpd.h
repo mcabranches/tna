@@ -25,7 +25,25 @@ class Tnafpd {
 		Tnafpd(void)
 		{
 			cout << "Initializing tnafpd" << endl;
-			_fpm_hook = FPM_XDP;
+			_fpm_hook = FPM_TC; //default
+		}
+
+		int set_dp_type(string dp_type) 
+		{
+			if (dp_type == "xdp_drv") {
+				_fpm_hook = FPM_XDP;
+				_flags = XDP_FLAGS_DRV_MODE;
+			}
+			else if (dp_type == "xdp") {
+				_fpm_hook = FPM_XDP;
+			}
+			else if (dp_type == "tc") {
+				_fpm_hook = FPM_TC;
+			}
+			else
+				return 0;
+			
+			return 1;
 		}
 
 		string get_fpm_hook(void)
