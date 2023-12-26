@@ -20,6 +20,7 @@ class Tnatm {
         Tnatm(void)
         {
             cout << "Initializing Topology Manager" << endl;
+
         }
 
         ~Tnatm(void)
@@ -33,16 +34,33 @@ class Tnatm {
         boost::property_tree::ptree tna_topo;
         boost::property_tree::ptree prev_tna_topo;
 
+        int set_dp_type(string dp_type)
+        {
+            return tnafpd.set_dp_type(dp_type);
+        }
+
+        int load_bpf(void)
+        {
+            return tnafpd.load_bpf();
+        }
+
+        void add_tna_fpd(void)
+        {
+            tnafpd.add_tna_fpd(&tnaodb);
+        }
+
         void add_tnabr(Tnabr *tnabr) 
         {
             cout << "Adding tnabr object to tnaodb" << endl;
             tnaodb.tnabr = tnabr;
+            fpms["tnabr"] = tnabr_fpm;
         }
 
         void add_tnartr(Tnartr *tnartr)
         {
             cout << "Adding tnartr object to tnaodb" << endl;
             tnaodb.tnartr = tnartr;
+            fpms["tnartr"] = tnartr_fpm;
         }
 
         void add_tnaipt(Tnaipt *tnaipt)
@@ -72,6 +90,9 @@ class Tnatm {
         {
             int master_index;
             for (int i = 0; i < MAX_INTERFACES; i++) {
+                if (ignore_ifs(interfaces[i])) {
+                    continue;
+                }
                 if (interfaces[i].type == "bridge") {
                     //cout << "Found bridge: " << interfaces[i].ifname << endl;
                     master_index = interfaces[i].ifindex;
@@ -84,6 +105,7 @@ class Tnatm {
                     tnabridge.has_l3 = interfaces[i].has_l3; 
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnabr->add_tna_bridge(tnabridge);
+                    tnaodb.tnartr->has_tnabr = 1;
 
                     if (tnabridge.has_l3)
                         if (tnaodb.tnaipt->has_ipt())
@@ -92,7 +114,7 @@ class Tnatm {
 
                     for (int i = 0; i < MAX_INTERFACES; i++) {
                          if (interfaces[i].master_index == master_index) {
-                            interfaces[i].xdp_set = 0;
+                            interfaces[i].fpm_set = 0;
                             if (interfaces[i].type == "Null")
                                 interfaces[i].type = "phys";
                             
@@ -101,13 +123,34 @@ class Tnatm {
                          }
                     }
                 }
+                else {
+                   interfaces[i].fpm_set = 0;
+                    if (interfaces[i].type == "Null")
+                        interfaces[i].type = "phys";
+                    tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
+                    tnaodb.tnartr->update_tna_rtr(&tnaodb.tnaifs[interfaces[i].ifname]);
+                }
             }
+        }
+
+        bool ignore_ifs(struct tna_interface interface) 
+        {
+            if(tnaodb.ignore_ifs.find(interface.ifname) != tnaodb.ignore_ifs.end())
+                return true;
+            else 
+                return false;
+            //return 0;
         }
 
         int deploy_tnafp(void)
         {
-            cout << "Updating TNA fast path" << endl;
-            call_tnafpa();
+            cout << "Updating TNA fast path" << endl;    
+
+            //update tna fp code
+            call_tnafpa("tnabr");
+            call_tnafpa("tnartr");
+            //call_tnafpa("tnaipvs")
+
             tnafpd.deploy_tnafp(&tnaodb);
             return 0; 
         }
@@ -115,36 +158,47 @@ class Tnatm {
     private:
         Tnafpd tnafpd = Tnafpd();
         hash<string> get_hash;
-        list<string> fpms, cfg;
+        list<string> cfg, tnabr_fpm, tnartr_fpm;
+        unordered_map<string, list<string>> fpms;
 
         int _update_tna_topo(void)
 		{
 			cout << "Updating TNA topology" << endl;
+            string property_path = "config.dp_type";
             prev_tna_topo = tna_topo;
             tna_topo.clear();
+            tna_topo.put(property_path, tnafpd.get_fpm_hook());
 
             tna_interface interface;
             unordered_map<string, struct tna_bridge>::iterator br_it;
             unordered_map<string, struct tna_interface>::iterator if_it;
+            unordered_map<string, struct tna_rtr *>::iterator rtr_it;
 
-            fpms.clear();
+            fpms["tnabr"].clear();
+            fpms["tnartr"].clear();
 
             //process bridges
             for (br_it = tnaodb.tnabr->tnabrs.begin(); br_it != tnaodb.tnabr->tnabrs.end(); ++br_it) {
                 if (br_it->second.brname != "") {
                     //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
-                    fpms.push_back("tnabr");
+                    fpms["tnabr"].push_back("tnabr");
 
                     if (br_it->second.has_l3) {
-                        fpms.push_back("tnartr");
+                        fpms["tnabr"].push_back("tnartr");
                         if (tnaodb.tnaipt->has_ipt()) {
                             br_it->second.has_ipt = 1;
-                            fpms.push_back("tnaipt");
+                            fpms["tnabr"].push_back("tnaipt");
                         }
                     }
                         
                     tna_topo_add_br_config(br_it->second);
                 }
+            }
+
+            //process router
+            if (tnaodb.tnartr) {
+                fpms["tnartr"].push_back("tnartr");
+                tna_topo_add_rtr_config(tnaodb.tnartr->tnartr);
             }
 
             //process interfaces
@@ -153,9 +207,6 @@ class Tnatm {
                     tnafpd.uninstall_tnafp(&if_it->second);
                 }
             }
-
-            tna_topo_add_fpm();
-            tna_topo_add_interfaces();
             
             return 0;
 		}
@@ -168,7 +219,19 @@ class Tnatm {
             boost::property_tree::ptree child;
             string parent = "fpms";
 
-            for (it = fpms.begin(); it != fpms.end(); ++it) {
+            //process tnabr
+            for (it = fpms["tnabr"].begin(); it != fpms["tnabr"].end(); ++it) {
+                elements.put_value(*it);
+                child.push_back(make_pair("",elements));
+                tna_topo.put_child(parent, child);
+                parent = it->c_str();
+            }
+
+            elements.clear();
+            child.clear();
+            
+            //process tnartr
+            for (it = fpms["tnartr"].begin(); it != fpms["tnartr"].end(); ++it) {
                 elements.put_value(*it);
                 child.push_back(make_pair("",elements));
                 tna_topo.put_child(parent, child);
@@ -233,6 +296,46 @@ class Tnatm {
             tna_topo.add_child(property_path, subtree);
         }
 
+        void tna_topo_add_rtr_config(struct tna_rtr tnartr)
+        {
+            unordered_map<string, struct tna_interface *>::iterator it;
+            boost::property_tree::ptree elements;
+            boost::property_tree::ptree subtree;
+
+            string property_path;
+            string property_path_child;
+
+            property_path = "config.tnartr.rtrname";
+            tna_topo.put(property_path, "tnartr1");
+
+            property_path = "config.tnartr.ipv4_fwd_enabled";
+            tna_topo.put(property_path, "1");
+
+            property_path = "config.tnartr.has_tnabr"; //get this from tnaodb on "update_rtr"
+            tna_topo.put(property_path, tnaodb.tnartr->has_tnabr);
+
+            property_path = "config.tnartr.has_ipt";
+            tna_topo.put(property_path, "0");
+
+            property_path = "config.tnartr.interfaces";
+
+            for (it = tnartr.rtrifs.begin(); it != tnartr.rtrifs.end(); ++it) {
+                property_path_child.erase();
+                property_path_child.append("name");
+                elements.put(property_path_child, it->second->ifname);
+                property_path_child.erase();
+                property_path_child.append("op_state");
+                elements.put(property_path_child, it->second->op_state_str);
+                property_path_child.erase();
+                property_path_child.append("type");
+                elements.put(property_path_child, it->second->type);
+                subtree.push_back(make_pair("",elements));
+            }
+            tna_topo.add_child(property_path, subtree);
+            cout << "Here..." << endl;
+        }
+
+
         bool _tna_topo_changed(void)
         {
             bool changed = false;
@@ -249,16 +352,14 @@ class Tnatm {
             return changed;
         }
 
-        int call_tnafpa(void)
+        int call_tnafpa(std::string fpm)
         {
             std::stringstream ss;
             std::string pycmd;
 
             boost::property_tree::json_parser::write_json(ss, tna_topo);
 
-            pycmd = "cd ./src/fp_assembler && python3 tnasynth.py '" + ss.str() + "'";
-
-            //cout << pycmd << endl;
+            pycmd = "cd ./src/fp_assembler && python3 tnasynth.py " + fpm + " '" + ss.str() + "'";
 
             system(pycmd.c_str());
 

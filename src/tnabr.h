@@ -67,7 +67,7 @@ class Tnabr {
 			cout << "Interface type: " << tnainterface->type << endl;
 
 			tnabrs[tnabridge.brname].brifs[tnainterface->ifname] =  tnainterface; //push_back(tnainterface);
-			tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->xdp_set = 0;
+			tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->fpm_set = 0;
 			tnabrs[tnabridge.brname].brifs[tnainterface->ifname]->ref_cnt += 1;			
 
 			update_br_ifs_info();
@@ -122,7 +122,7 @@ class Tnabr {
 
             struct tna_bridge tnabridge;
             char *br_name = NULL;
-            int xdp_set;
+            int fpm_set;
 
             br_name = (char *)alloca(sizeof(char *) * IFNAMSIZ);
 
@@ -156,9 +156,9 @@ class Tnabr {
 					if (tnabrs[br_name].brname.length() == 0)
 						return -2;
                     //cout << "Interface exists on bridge " << br_name << " updating state ..." << endl;
-                    xdp_set = tnabrs[br_name].brifs[interface->ifname]->xdp_set;
+                    fpm_set = tnabrs[br_name].brifs[interface->ifname]->fpm_set;
                     tnabrs[br_name].brifs[interface->ifname] = interface;
-                    tnabrs[br_name].brifs[interface->ifname]->xdp_set = xdp_set;
+                    tnabrs[br_name].brifs[interface->ifname]->fpm_set = fpm_set;
                 }
                 else if (interface->master_index > 1) {
                     	add_if_tna_bridge(tnabrs[br_name], interface);
@@ -170,7 +170,7 @@ class Tnabr {
 					del_tna_bridge(tnabridge);
 				}
 
-				else if (interface->type == "phys") {
+				else if ((interface->type == "phys") || (interface->type == "veth")) {
 					if (interface->master_index != 0) {
 						remove_if_tna_bridge(tnabrs[br_name], tnabrs[br_name].brifs[interface->ifname]);
 					}

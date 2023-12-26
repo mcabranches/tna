@@ -6,6 +6,8 @@
 
 #define AF_INET		2	/* Internet IP Protocol 	*/
 #define ETH_P_IP        0x0800                /* Internet Protocol packet        */
+#define TC_ACT_OK 0
+#define TC_ACT_SHOT 1
 
 /* trace is written to /sys/kernel/debug/tracing/trace_pipe */
 #define bpf_debug(fmt, ...)                                             \
@@ -33,7 +35,7 @@ struct tna_meta_t {
 	struct bpf_ipt_lookup ipt_params;
 };
 
-    /* based on include/net/ip.h */
+	    /* based on include/net/ip.h */
 static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 {
 	__u32 check = (__u32)iph->check;
@@ -43,7 +45,7 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 	return --iph->ttl;
 }
 
-static __always_inline int tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_meta)
+static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta)
 {
 	int rc;
 	struct bpf_fib_lookup fib_params = {0};
@@ -68,36 +70,37 @@ static __always_inline int tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_met
 		__builtin_memcpy(tna_meta->eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta->eth->h_source, fib_params.smac, ETH_ALEN);
 
+		//return bpf_redirect(fib_params.ifindex, 0);
+
         //#bridge/vlan dependent
-		tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
-		tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
+		//tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
+		//tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
 
         
-		bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
+		//bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
         //#end of bridge/vlan dependent
 
-		            //#tnartr dependent
-		tna_meta->ipt_params.ifindex = fib_params.ifindex;
-		tna_meta->ipt_params.egress_ifindex = tna_meta->fdb_params.egress_ifindex;
-		bpf_ipt_lookup(ctx, &tna_meta->ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta->iph);
-
-		bpf_debug("verdict: %i\n", tna_meta->ipt_params.verdict);
-		if (tna_meta->ipt_params.verdict == 255)
-			return XDP_DROP;
-//#end of tnartr dependent 
-        
-        //#bridge dependent 
+				        
+        //bridge dependent
+						//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
+		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
 		if (tna_meta->fdb_params.egress_ifindex > 0)
-			return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
+							return bpf_redirect(tna_meta->fdb_params.egress_ifindex, 0);
+				else 
+			return bpf_redirect(fib_params.ifindex, 0);
 		}
+						
         //#end of bridge dependent
         //need to add a non bridge dependent redirect (pure l3)
+		//return bpf_redirect(fib_params.ifindex, 0);
 	return 0;
 } 
 
 
+
 SEC("TNAFPM")
-int tnabr(struct xdp_md* ctx)
+
+int tnabr(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
@@ -130,37 +133,39 @@ int tnabr(struct xdp_md* ctx)
 
 	if (tna_meta.fdb_params.egress_ifindex > 0 && tna_meta.fdb_params.flags == 1) {
 		//Is it possible to see if the port is untagged via the helper?
-		if (tna_meta.fdb_params.egress_ifindex == 5)
-			vlan_tag_pop(ctx, tna_meta.eth);
-		return bpf_redirect_map(&tx_port, tna_meta.fdb_params.egress_ifindex, 0);
-	}
+		//if (tna_meta.fdb_params.egress_ifindex == 5)
+		//	vlan_tag_pop(ctx, tna_meta.eth);
+							return bpf_redirect(tna_meta.fdb_params.egress_ifindex, 0);
+			}
 
 	if (tna_meta.fdb_params.flags == 0) { //STP learning
-		return XDP_PASS;
-	}
+						return TC_ACT_OK;
+			}
 
 	if (tna_meta.fdb_params.flags == 2) { //STP blocked
-		return XDP_DROP;
-	}
+						return TC_ACT_SHOT;
+			}
 
-        //This should only be deployed if bridge vlan interfaces have IP addresses configured on them
+		
+	//This should only be deployed if bridge vlan interfaces have IP addresses configured on them
     //Logic for detecting this goes in the "service introspection"
 	if (tna_meta.fdb_params.flags == 3 && nh_type == bpf_htons(ETH_P_IP)) {
 		//bpf_debug("Needs routing\n");
 		tna_meta.iph = nh.pos;
 
 		if (tna_meta.iph + 1 > data_end)
-			return XDP_DROP;
-
+									return TC_ACT_SHOT;
+			
 		tna_meta.vlh = (void *)(tna_meta.eth + 1);
 
 		if (tna_meta.vlh + 1 > data_end)
-			return XDP_DROP;
-    
+									return TC_ACT_SHOT;
+			    
 
 		return tnartr(ctx, &tna_meta);
 	}
-    	return XDP_PASS;
-}
+        
+			return TC_ACT_OK;
+	}
 
 char _license[] SEC("license") = "GPL";

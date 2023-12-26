@@ -19,25 +19,8 @@
 
 
 struct {
-	__uint(type, BPF_MAP_TYPE_DEVMAP);
+	__uint(type, BPF_MAP_TYPE_PROG_ARRAY);
 	__uint(max_entries, 20);
-	__type(key, int);
-	__type(value, int);
-} tx_port SEC(".maps");
-
-
-struct tna_meta_t {
-	struct ethhdr *eth;
-	struct iphdr *iph;
-	struct vlan_hdr *vlh;
-	struct bpf_fib_lookup fib_params;
-	struct bpf_fdb_lookup fdb_params;
-	struct bpf_ipt_lookup ipt_params;
-};
-
-{% if "tnabr" in fpms['config']['fpm'] %}
-	{% include "tnabr_ep.fpm" %}
-{% endif %}
-{% if "tnartr" in fpms['config']['fpm'] %}
-	{% include "tnartr_ep.fpm" %}
-{% endif %}
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(int));
+} jmp_table SEC(".maps");

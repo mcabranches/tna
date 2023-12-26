@@ -156,6 +156,8 @@ class Tnanl {
             self->build_nl_cache();
             self->get_cached_interface(&ifs_entry);
 
+            //cout << "ifs_entry.ifname: " << ifs_entry.ifname << endl;
+
             if (nlmsg_type == RTM_NEWLINK || nlmsg_type == RTM_DELLINK) 
                 self->parse_ifla(nlh, if_info, &ifs_entry, &tna_event, self);
 
@@ -249,6 +251,7 @@ class Tnanl {
 
             if (ifs_entry->ifindex == ifs_entry->master_index) {
                 ifs_entry->type = "bridge";
+                tna_event->event_flag |= tna_g_ns::TNA_BR_EVENT;
             }
 
             if (if_info->ifi_flags && if_info->ifi_change) {
@@ -300,6 +303,7 @@ class Tnanl {
             else if ((int) nlh->nlmsg_type == RTM_DELADDR) {
                 ifs_entry->has_l3 = 0;
                 self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].has_l3 = 0;
+                tna_event->event_flag |= tna_g_ns::TNA_RTR_EVENT;
             }
 
             if ((self->tnatm->tnaodb.tnaifs[ifs_entry->ifname].master_index != 0)

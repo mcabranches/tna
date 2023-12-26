@@ -1,15 +1,22 @@
 from jinja2 import Environment, FileSystemLoader
 import sys, json
 
-fpms = []
+fpm = sys.argv[1]
+tnafp = json.loads(sys.argv[2])
 
-tnafp = json.loads(sys.argv[1])
+if (len(tnafp.keys()) > 0):
 
-environment = Environment(loader=FileSystemLoader("../accel_library"), trim_blocks=True)
+    environment = Environment(loader=FileSystemLoader("../accel_library"), trim_blocks=True)
 
-template = environment.get_template("tnafp.fpm")
+    template = environment.get_template("tnafp.fpm")
 
-content = template.render(fpms=tnafp)
+    tnafp['config']['fpm'] = fpm
 
-with open("tnafpm.bpf.c", mode="w", encoding="utf-8") as fpsrc:
-    fpsrc.write(content)
+    content = template.render(fpms=tnafp)
+
+    fpm_src_path = "./" + fpm + "/"
+
+    fpm_src = "tnafpm" + "." + fpm[3:] + ".bpf.c"
+
+    with open(fpm_src_path + fpm_src, mode="w", encoding="utf-8") as fpsrc:
+        fpsrc.write(content)

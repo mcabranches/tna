@@ -8,7 +8,12 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 	return --iph->ttl;
 }
 
-static __always_inline int tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_meta)
+{% if fpms['config']['dp_type'] == "FPM_XDP" %}
+static __always_inline tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_meta)
+{% endif %}
+{% if fpms['config']['dp_type'] == "FPM_TC" %}
+static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta)
+{% endif %}
 {
 	int rc;
 	struct bpf_fib_lookup fib_params = {0};
@@ -33,23 +38,42 @@ static __always_inline int tnartr(struct xdp_md* ctx, struct tna_meta_t* tna_met
 		__builtin_memcpy(tna_meta->eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta->eth->h_source, fib_params.smac, ETH_ALEN);
 
+		//return bpf_redirect(fib_params.ifindex, 0);
+
         //#bridge/vlan dependent
-		tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
-		tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
+		//tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
+		//tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
 
         
-		bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
+		//bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
         //#end of bridge/vlan dependent
 
-		{% if "tnaipt" in fpms['tnartr'] %}
+		{% if fpms['config']['tnartr'] %}
+		{% if fpms['config']['tnartr']['has_ipt'] == '1' %}
             {% include "tnaipt.fpm" %} 
         {% endif %}
+        {% endif %}
 
-        //#bridge dependent 
+        //bridge dependent
+		{% if fpms['config']['tnartr'] %}
+		{% if fpms['config']['tnartr']['has_tnabr'] == '1' %}
+		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
+		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
 		if (tna_meta->fdb_params.egress_ifindex > 0)
+		{% if fpms['config']['dp_type'] == "FPM_XDP" %}
 			return bpf_redirect_map(&tx_port, tna_meta->fdb_params.egress_ifindex, 0);
+		{% endif %}
+		{% if fpms['config']['dp_type'] == "FPM_TC" %}
+			return bpf_redirect(tna_meta->fdb_params.egress_ifindex, 0);
+		{% endif %}
+		else 
+			return bpf_redirect(fib_params.ifindex, 0);
 		}
+		{% endif %}
+		{% endif %}
+		
         //#end of bridge dependent
         //need to add a non bridge dependent redirect (pure l3)
+		//return bpf_redirect(fib_params.ifindex, 0);
 	return 0;
 }

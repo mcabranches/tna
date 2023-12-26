@@ -1,12 +1,12 @@
-#include "tnafp.bpf.h"
+#include "tnafp.tc.bpf.h"
 
 
-SEC("xdptna")
-int xdp_tna_main_0(struct xdp_md* ctx) {
+SEC("tc")
+int tc_tna_main_0(struct __sk_buff *ctx) {
 
 	bpf_tail_call(ctx, &jmp_table, ctx->ingress_ifindex);
 
-	return XDP_PASS;
+	return TC_ACT_OK;
 }
 
 char _license[] SEC("license") = "GPL";

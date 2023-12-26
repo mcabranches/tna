@@ -7,7 +7,7 @@ LLVM_STRIP ?= llvm-strip
 
 LIBBPF_SRC := $(abspath ../libbpf/src)
 BPFTOOL_SRC := $(abspath ../bpftool/src)
-TNAFPM_SRC := $(abspath ./fp_assembler)
+##TNAFPM_SRC := $(abspath ./fp_assembler)
 
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 BPFTOOL ?= $(abspath $(OUTPUT)/bpftool/bpftool)
@@ -21,7 +21,8 @@ INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I../com
 CXXFLAGS := -g -Wall
 
 TNAFP = tnafp
-TNAFPM = tnafpm
+TNAFPTC = tnafp.tc
+#TNAFPM = tnafpm
 APP = tna
 
 CLANG_BPF_SYS_INCLUDES = $(shell $(CLANG) -v -E - </dev/null 2>&1 \
@@ -59,12 +60,19 @@ $(OUTPUT)/$(TNAFP).skel.h: $(OUTPUT)/$(TNAFP).bpf.o
 
 $(TNAFP): $(OUTPUT)/$(TNAFP).bpf.o $(OUTPUT)/$(TNAFP).skel.h
 
-$(TNAFPM):
-	make -C $(TNAFPM_SRC) all
+# Build kernel side tc/bpf apps
+$(OUTPUT)/$(TNAFPTC).bpf.o: $(patsubst %, %.bpf.c, $(TNAFPTC)) | $(OUTPUT) $(BPFTOOL) $(LIBBPF_OBJ) $(VMLINUX)
+	$(CLANG) -g -O2 -Wall -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -c $(patsubst %, %.bpf.c, $(TNAFPTC)) -o $@
+	$(LLVM_STRIP) -g $@ # strip useless DWARF info
 
-# Build controller code
-$(APP): $(TNAFP) $(TNAFPM) | $(OUTPUT) $(LIBBPF_OBJ)
-	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -fpermissive -w -o $(BUILD_DIR)/$@
+$(OUTPUT)/$(TNAFPTC).skel.h: $(OUTPUT)/$(TNAFPTC).bpf.o
+	$(BPFTOOL) gen skeleton $(OUTPUT)/$(TNAFPTC).bpf.o > $@
+
+$(TNAFPTC): $(OUTPUT)/$(TNAFPTC).bpf.o $(OUTPUT)/$(TNAFPTC).skel.h
+
+
+$(APP): $(TNAFP) $(TNAFPTC) | $(OUTPUT) $(LIBBPF_OBJ)
+	$(CXX) $(CXXFLAGS) $(APP).cc $(LIBBPF_OBJ) $(INCLUDES) -lelf -lz -lnl-route-3 -lnl-3 -lpthread -lip4tc -lip6tc -lxtables -lboost_program_options -fpermissive -w -o $(BUILD_DIR)/$@
 
 # Generate vmlinux.h
 $(VMLINUX): $(VMLINUX_DIR) $(BPFTOOL) $(APP)

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <linux/if_link.h>
 #include <list>
+#include <set>
 #include <iterator>
 #include <unordered_map>
 #include <queue>
@@ -20,10 +21,21 @@
 #include <mutex>
 #include <net/if.h>
 #include <fstream>
+#include <bpf/bpf.h>
 
+#define FPM_XDP 0
+#define FPM_TC 1 
 
 using namespace std;
 
+struct tna_fpd {
+	struct bpf_prog_load_attr fpm_prog_load_attr;
+	struct bpf_object *fpm_bpf_obj;
+	struct bpf_program *fpm_bpf_prog;
+	struct bpf_map *fpm_dev_map; 
+	int fpm_dev_map_fd = 0;
+	int fpm_fd = 0;	
+};
 
 struct tna_vlan {
 	int vid;
@@ -34,11 +46,12 @@ struct tna_interface {
 	int ifindex;
 	int master_index;
 	int is_veth;
-	int xdp_set;
+	int fpm_set;
 	int tna_event_type; //m-> topology manager should use this (see old update_tna_bridge - tnanl.h)
 	int has_vlan;
 	int has_l3;
-	int ref_cnt; 
+	int ref_cnt;
+	int ignore;
 	uint8_t op_state;
 	/* save vlan list for each interface on tna_bridge object */
 	unordered_map<int, struct tna_vlan> vlans;
@@ -56,6 +69,8 @@ struct Tnaodb {
 	class Tnaipt *tnaipt;
 	//add other objects
 	unordered_map <string, struct tna_interface> tnaifs;
+	unordered_map <string, struct tna_fpd*> tnafpd;
+	set<string> ignore_ifs;
 };
 
 //add atributes related to STP, l3 and vlans
@@ -70,6 +85,11 @@ struct tna_bridge {
 	string brname;
 	string op_state_str;
 	unordered_map<string, struct tna_interface *> brifs;
+};
+
+struct tna_rtr {
+	int has_rtr_br;
+	unordered_map<string, struct tna_interface *> rtrifs;
 };
 
 struct tna_event {
@@ -139,8 +159,50 @@ namespace util {
 		    printf("XDP program loaded\n");
 	    }
 
-	return 0;
+		return 0;
     }
+
+	static int uninstall_tc(int ifindex, int tc_flags)
+    {
+		DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_hook, .ifindex = ifindex,
+			    .attach_point = BPF_TC_INGRESS);
+		DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_opts, .handle = 1, .priority = 1);
+		int err;
+
+		tc_opts.flags = tc_opts.prog_fd = tc_opts.prog_id = 0;
+	    err = bpf_tc_detach(&tc_hook, &tc_opts);
+
+		if (err) {
+			printf("Failed to dettach TC");
+		}
+
+		bpf_tc_hook_destroy(&tc_hook);
+
+	    return 1;
+	}
+
+	static int install_tc(struct bpf_program *tc_prog, int ifindex, int tc_flags)
+    {
+		DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_hook, .ifindex = ifindex,
+			    .attach_point = BPF_TC_INGRESS);
+		DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_opts, .handle = 1, .priority = 1);
+
+		int err;
+	    int bpf_prog_fd = bpf_program__fd(tc_prog);
+
+		bpf_tc_hook_create(&tc_hook);
+
+		tc_opts.prog_fd = bpf_program__fd(tc_prog);
+		tc_opts.flags = 0;
+
+		err = bpf_tc_attach(&tc_hook, &tc_opts);
+		if (err) {
+			printf("Failed to attach TC");
+		}
+
+		return 0;
+    }
+
 }
 
 #endif
