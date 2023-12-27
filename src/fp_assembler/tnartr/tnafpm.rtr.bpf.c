@@ -129,12 +129,7 @@ int tnartr(struct __sk_buff *ctx)
 		__builtin_memcpy(tna_meta.eth->h_source, fib_params.smac, ETH_ALEN);
 		
     	//#bridge/vlan dependent
-					 	tna_meta.fdb_params.vid = fib_params.h_vlan_TCI;
-
-		tna_meta.fdb_params.ifindex = fib_params.ifindex;
-        
-	 	bpf_fdb_lookup(ctx, &tna_meta.fdb_params, sizeof(tna_meta.fdb_params), tna_meta.eth->h_source, tna_meta.eth->h_dest);
-				
+						
         //end of bridge/vlan dependent
 
         //bridge dependent 

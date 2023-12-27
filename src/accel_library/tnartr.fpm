@@ -69,8 +69,11 @@ static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta
 		else 
 			return bpf_redirect(fib_params.ifindex, 0);
 		}
+		{% else %}
+		}
 		{% endif %}
 		{% endif %}
+
 		
         //#end of bridge dependent
         //need to add a non bridge dependent redirect (pure l3)

@@ -120,11 +120,13 @@ class Tnatm {
                             
                             tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                             tnaodb.tnabr->add_if_tna_bridge(tnabridge, &tnaodb.tnaifs[interfaces[i].ifname]);
+                            tnaodb.tnaifs[interfaces[i].ifname].ref_cnt += 1;
                          }
                     }
                 }
                 else {
-                   interfaces[i].fpm_set = 0;
+                    interfaces[i].fpm_set = 0;
+                    interfaces[i].ref_cnt = tnaodb.tnaifs[interfaces[i].ifname].ref_cnt;
                     if (interfaces[i].type == "Null")
                         interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
@@ -160,6 +162,7 @@ class Tnatm {
         hash<string> get_hash;
         list<string> cfg, tnabr_fpm, tnartr_fpm;
         unordered_map<string, list<string>> fpms;
+        int has_tnabr = 0;
 
         int _update_tna_topo(void)
 		{
@@ -182,6 +185,7 @@ class Tnatm {
                 if (br_it->second.brname != "") {
                     //cout << "Adding bridge to tna_topo: " << br_it->second.brname << endl;
                     fpms["tnabr"].push_back("tnabr");
+                    has_tnabr = 1;
 
                     if (br_it->second.has_l3) {
                         fpms["tnabr"].push_back("tnartr");
@@ -198,6 +202,8 @@ class Tnatm {
             //process router
             if (tnaodb.tnartr) {
                 fpms["tnartr"].push_back("tnartr");
+                tnaodb.tnartr->has_tnabr = has_tnabr;
+
                 tna_topo_add_rtr_config(tnaodb.tnartr->tnartr);
             }
 
@@ -332,7 +338,6 @@ class Tnatm {
                 subtree.push_back(make_pair("",elements));
             }
             tna_topo.add_child(property_path, subtree);
-            cout << "Here..." << endl;
         }
 
 
@@ -361,6 +366,7 @@ class Tnatm {
 
             pycmd = "cd ./src/fp_assembler && python3 tnasynth.py " + fpm + " '" + ss.str() + "'";
 
+            //while (system(pycmd.c_str()));
             system(pycmd.c_str());
 
             return 0;

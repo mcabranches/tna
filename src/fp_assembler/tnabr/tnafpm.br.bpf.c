@@ -35,67 +35,7 @@ struct tna_meta_t {
 	struct bpf_ipt_lookup ipt_params;
 };
 
-	    /* based on include/net/ip.h */
-static __always_inline int ip_decrease_ttl(struct iphdr *iph)
-{
-	__u32 check = (__u32)iph->check;
-
-	check += (__u32)bpf_htons(0x0100);
-	iph->check = (__sum16)(check + (check >= 0xFFFF));
-	return --iph->ttl;
-}
-
-static __always_inline tnartr(struct __sk_buff *ctx, struct tna_meta_t* tna_meta)
-{
-	int rc;
-	struct bpf_fib_lookup fib_params = {0};
-
-
-	fib_params.family	= AF_INET;
-	fib_params.tos		= tna_meta->iph->tos;
-	fib_params.l4_protocol	= tna_meta->iph->protocol;
-	fib_params.sport	= 0;
-	fib_params.dport	= 0;
-	fib_params.tot_len	= bpf_ntohs(tna_meta->iph->tot_len);
-	fib_params.ipv4_src	= tna_meta->iph->saddr;
-	fib_params.ipv4_dst	= tna_meta->iph->daddr;
-
-	fib_params.ifindex = ctx->ingress_ifindex;
-		
-	rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
 	
-	if (rc == BPF_FIB_LKUP_RET_SUCCESS) {
-		ip_decrease_ttl(tna_meta->iph);
-
-		__builtin_memcpy(tna_meta->eth->h_dest, fib_params.dmac, ETH_ALEN);
-		__builtin_memcpy(tna_meta->eth->h_source, fib_params.smac, ETH_ALEN);
-
-		//return bpf_redirect(fib_params.ifindex, 0);
-
-        //#bridge/vlan dependent
-		//tna_meta->vlh->h_vlan_TCI = bpf_htons(fib_params.h_vlan_TCI);
-		//tna_meta->fdb_params.vid = fib_params.h_vlan_TCI;
-
-        
-		//bpf_fdb_lookup(ctx, &tna_meta->fdb_params, sizeof(tna_meta->fdb_params), tna_meta->eth->h_source, tna_meta->eth->h_dest);
-        //#end of bridge/vlan dependent
-
-				        
-        //bridge dependent
-						//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
-		//bpf_debug("%i", tna_meta->fdb_params.egress_ifindex);
-		if (tna_meta->fdb_params.egress_ifindex > 0)
-							return bpf_redirect(tna_meta->fdb_params.egress_ifindex, 0);
-				else 
-			return bpf_redirect(fib_params.ifindex, 0);
-		}
-						
-        //#end of bridge dependent
-        //need to add a non bridge dependent redirect (pure l3)
-		//return bpf_redirect(fib_params.ifindex, 0);
-	return 0;
-} 
-
 
 
 SEC("TNAFPM")
@@ -146,25 +86,7 @@ int tnabr(struct __sk_buff *ctx)
 						return TC_ACT_SHOT;
 			}
 
-		
-	//This should only be deployed if bridge vlan interfaces have IP addresses configured on them
-    //Logic for detecting this goes in the "service introspection"
-	if (tna_meta.fdb_params.flags == 3 && nh_type == bpf_htons(ETH_P_IP)) {
-		//bpf_debug("Needs routing\n");
-		tna_meta.iph = nh.pos;
-
-		if (tna_meta.iph + 1 > data_end)
-									return TC_ACT_SHOT;
-			
-		tna_meta.vlh = (void *)(tna_meta.eth + 1);
-
-		if (tna_meta.vlh + 1 > data_end)
-									return TC_ACT_SHOT;
-			    
-
-		return tnartr(ctx, &tna_meta);
-	}
-        
+	
 			return TC_ACT_OK;
 	}
 
