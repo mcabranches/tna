@@ -9,6 +9,10 @@
 #define ETH_P_8021AD 0x88A8
 #define AF_INET 2
 
+// ip address of the load balancer, 10.1.1.2
+#define LB_IP_ADDR 0x201010a
+
+//#define DEBUG 1
 #ifdef DEBUG
 #define bpf_debug(fmt, ...) \
 ({ \
@@ -39,12 +43,7 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 	return --iph->ttl;
 }
 
-SEC("xdp_pass")
-int xdp_pass_func(struct xdp_md *ctx)
-{
-	return XDP_PASS;
-}
-
+// Update the checksum
 static inline __u16 incr_check_l(__u16 old_check, __u32 old, __u32 new)
 { /* see RFC's 1624, 1141 and 1071 for incremental checksum updates */
 	__u32 l;
@@ -89,101 +88,88 @@ int  xdp_parser_func(struct xdp_md *ctx)
 	 * header type in the packet correct?), and bounds checking.
 	 */
 	nh_type = parse_ethhdr(&nh, data_end, &eth);
-	if (nh_type != ETH_P_IPV6 && nh_type != ETH_P_IP)
+
+	// we only support ipv4 right now
+	if (nh_type != bpf_htons(ETH_P_IP)) {
+		bpf_debug("Packet is not of type ETH_P_IP\n");
 		goto out;
-
-	if(nh_type == ETH_P_IP) {
-		nxthdr = parse_iphdr(&nh, data_end, &iphdr);
-
-		if(nxthdr == IPPROTO_TCP) {
-			len = parse_tcphdr(&nh, data_end, &tcphdr);
-			if(len < 0)
-				goto out;
-
-			params.source_port = tcphdr->source;
-			params.dest_port = tcphdr->dest;
-			bpf_ip_vs_lookup(ctx, &params, sizeof(params), iphdr);
-			
-			if(!params.in)
-				goto out;
-			bpf_debug("Dest: %x\n", params.in);
-			
-			if(params.in == iphdr->saddr) {
-				iphdr->check = incr_check_l(iphdr->check, iphdr->saddr, 0x201010a);
-				bpf_debug("Back IP check = %x, %x, %x\n", iphdr->check, iphdr->saddr, 0x201010a);
-				tcphdr->check = incr_check_l(tcphdr->check, iphdr->saddr, 0x201010a);
-				bpf_debug("Back TCP check = %x, %x, %x\n", tcphdr->check, iphdr->saddr, 0x201010a);
-				iphdr->saddr = 0x201010a;
-			}
-			else {
-				iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, params.in);
-				bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, params.in);
-				tcphdr->check = incr_check_l(tcphdr->check, iphdr->daddr, params.in);
-				bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, params.in);
-				iphdr->daddr = params.in;
-			}
-		}
-		else if(nxthdr == IPPROTO_UDP) {
-			len = parse_udphdr(&nh, data_end, &udphdr);
-			if(len < 0)
-				goto out;
-
-			params.source_port = udphdr->source;
-			params.dest_port = udphdr->dest;
-			bpf_ip_vs_lookup(ctx, &params, sizeof(params), iphdr);
-			
-			if(!params.in)
-				goto out;
-			bpf_debug("Dest: %x\n", params.in);
-			
-			if(params.in == iphdr->saddr) {
-				iphdr->check = incr_check_l(iphdr->check, iphdr->saddr, 0x201010a);
-				bpf_debug("Back IP check = %x, %x, %x\n", iphdr->check, iphdr->saddr, 0x201010a);
-				udphdr->check = incr_check_l(udphdr->check, iphdr->saddr, 0x201010a);
-				bpf_debug("Back TCP check = %x, %x, %x\n", udphdr->check, iphdr->saddr, 0x201010a);
-				iphdr->saddr = 0x201010a;
-			}
-			else {
-				iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, params.in);
-				bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, params.in);
-				udphdr->check = incr_check_l(udphdr->check, iphdr->daddr, params.in);
-				bpf_debug("Forward TCP check = %x, %x, %x\n", udphdr->check, iphdr->daddr, params.in);
-				iphdr->daddr = params.in;
-			}
-		}
-		else
-			goto out;
-
-
-		fib_params.family	= AF_INET;
-		fib_params.tos		= iphdr->tos;
-		fib_params.l4_protocol	= iphdr->protocol;
-		fib_params.sport	= 0;
-		fib_params.dport	= 0;
-		fib_params.tot_len	= bpf_ntohs(iphdr->tot_len);
-		fib_params.ipv4_src	= iphdr->saddr;
-		fib_params.ipv4_dst	= iphdr->daddr;
 	}
-	else
+	bpf_debug("Packet is of type ETH_P_IP\n");
+	
+
+	// Parse the next header - we support only TCP and UDP
+	nxthdr = parse_iphdr(&nh, data_end, &iphdr);
+	bpf_debug("Packet type? nxthdr=%x IPPROTO_TCP=%x\n", nxthdr, IPPROTO_TCP);
+	if (nxthdr == IPPROTO_TCP) {
+		bpf_debug("Packet is of type IPPROTO_TCP\n");
+
+		// Parse the TCP header
+		len = parse_tcphdr(&nh, data_end, &tcphdr);
+		if(len < 0) {
+			bpf_debug("Malformed TCP header? This shouldn't happen??\n");
+			goto out;
+		}
+
+		// Populate the parameter and perform the lookup
+		params.source_port = tcphdr->source;
+		params.dest_port = tcphdr->dest;
+		bpf_ip_vs_lookup(ctx, &params, sizeof(params), iphdr);	
+		if (!params.in) {
+			bpf_debug("bpf_ip_vs_lookup failed??\n");
+			goto out;
+		}
+		bpf_debug("Lookup returned destination: %x\n", params.in);
+
+		if (params.in != iphdr->saddr) {
+			// Rewrite the destination IP address to be the returned destination.
+			iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, params.in);
+			bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, params.in);
+			tcphdr->check = incr_check_l(tcphdr->check, iphdr->daddr, params.in);
+			bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, params.in);
+			iphdr->daddr = params.in;
+		} else {
+			// If the source is the current machine.... ??
+			bpf_debug("Destination is source??: %x -> %x; Ignoring for now...\n", iphdr->saddr, LB_IP_ADDR);
+
+			/*
+			iphdr->check = incr_check_l(iphdr->check, iphdr->saddr, LB_IP_ADDR);
+			bpf_debug("Back IP check = %x, %x, %x\n", iphdr->check, iphdr->saddr, LB_IP_ADDR);
+			tcphdr->check = incr_check_l(tcphdr->check, iphdr->saddr, LB_IP_ADDR);
+			bpf_debug("Back TCP check = %x, %x, %x\n", tcphdr->check, iphdr->saddr, LB_IP_ADDR);
+			iphdr->saddr = LB_IP_ADDR;
+			*/
+		}
+	} else {
+		// Not TCP
 		goto out;
+	}
 
-
+	fib_params.family	= AF_INET;
+	fib_params.tos		= iphdr->tos;
+	fib_params.l4_protocol	= iphdr->protocol;
+	fib_params.sport	= 0;
+	fib_params.dport	= 0;
+	fib_params.tot_len	= bpf_ntohs(iphdr->tot_len);
+	fib_params.ipv4_src	= iphdr->saddr;
+	fib_params.ipv4_dst	= iphdr->daddr;
 	fib_params.ifindex = ctx->ingress_ifindex;
 
 	rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
 	switch (rc) {
 	case BPF_FIB_LKUP_RET_SUCCESS:         /* lookup successful */
-		if (nh_type == ETH_P_IP){
-			if(iphdr + 1 < data_end)
+		// No need ot check nh_type since we only care about IPv4 here.
+		//if (nh_type == ETH_P_IP){
+		if(iphdr + 1 < data_end) {
 			ip_decrease_ttl(iphdr);
 		}
-		else
-			goto out;
+		//}
+		//else
+		//	goto out;
 
 		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
 		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
-
 		action = bpf_redirect(fib_params.ifindex, 0);
+
 		break;
 	case BPF_FIB_LKUP_RET_BLACKHOLE:    /* dest is blackholed; can be dropped */
 	case BPF_FIB_LKUP_RET_UNREACHABLE:  /* dest is unreachable; can be dropped */
