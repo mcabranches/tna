@@ -7,7 +7,7 @@
 #define AF_INET		2	/* Internet IP Protocol 	*/
 #define ETH_P_IP        0x0800                /* Internet Protocol packet        */
 #define TC_ACT_OK 0
-#define TC_ACT_SHOT 1
+#define TC_ACT_SHOT 2
 
 /* trace is written to /sys/kernel/debug/tracing/trace_pipe */
 #define bpf_debug(fmt, ...)                                             \
