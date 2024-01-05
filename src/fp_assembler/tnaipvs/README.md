@@ -15,3 +15,12 @@ Then build the ipvs bpf code:
 cd tna/src/fp_assembler/tnaipvs
 make
 ```
+
+Instructions to install/remove the tc code:
+```
+sudo tc qdisc add dev ens1f1np1 clsact
+sudo tc filter add dev ens1f1np1 ingress matchall action bpf object-file build/.output/tnaipvstc.bpf.o
+sudo tc filter show dev ens1f1np1 ingress
+sudo tc qdisc del dev ens1f1np1 clsact
+sudo tc filter show dev ens1f1np1 ingress
+```

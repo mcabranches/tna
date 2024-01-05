@@ -24,7 +24,7 @@
 })
 #endif
 
-SEC("tc")
+SEC("action")
 int tc_ingress(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(__u64)ctx->data_end;
