@@ -49,6 +49,11 @@ int tc_ingress(struct __sk_buff *ctx)
         return TC_ACT_OK;
     }
 
+    if (l3->protocol != IPPROTO_TCP) {
+        bpf_debug("Not TCP? %x, but expected %x\n", l3->protocol, IPPROTO_TCP);
+        return TC_ACT_OK;
+    }
+
     bpf_debug("Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
 }
