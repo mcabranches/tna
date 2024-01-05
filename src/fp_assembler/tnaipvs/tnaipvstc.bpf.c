@@ -6,13 +6,16 @@
 
 #include "../common/parsing_helpers.h"
 
-#define NULL 0
-#define AF_INET 2
-#define ETH_P_IP 0x0800 /* Internet Protocol packet */
+#define NULL        0
+#define ETH_ALEN    6
+#define AF_INET     2
+#define ETH_P_IP    0x0800 /* Internet Protocol packet */
 
-#define TC_ACT_OK 0
+#define TC_ACT_OK   0
+#define TC_ACT_SHOT	2
 
-#define DEST_IP 0x201010a
+#define ORIG_DEST_IP 0x201010a // IP addr on local host that's part of src network
+#define NEW_DEST_IP 0x0201a8c0 // IP addr of sink 1
 
 #define DEBUG 1
 #ifdef DEBUG
@@ -27,6 +30,14 @@
     while (0); \
 })
 #endif
+
+static __always_inline int ip_decrease_ttl(struct iphdr *iph)
+{
+	__u32 check = iph->check;
+	check += bpf_htons(0x0100);
+	iph->check = (__u16)(check + (check >= 0xFFFF));
+	return --iph->ttl;
+}
 
 // Update the checksum
 static inline __u16 incr_check_l(__u16 old_check, __u32 old, __u32 new)
@@ -64,13 +75,6 @@ int tc_ingress(struct __sk_buff *ctx)
     struct bpf_fib_lookup fib_params = {};
     int rc;
 
-    /*
-    // Used to lookup ip addr
-    struct bpf_ip_vs_lookup params = {
-        .in = 0
-    };
-    */
-
     // Start next header cursor position at data start
     nh.pos = (void *)(__u64)ctx->data;
 
@@ -93,24 +97,17 @@ int tc_ingress(struct __sk_buff *ctx)
         goto out;
     }
 
-    /*
-    // TODO: perform lookup
-    params.source_port = tcphdr->source;
-    params.dest_port = tcphdr->dest;
-    bpf_ip_vs_lookup(data, &params, sizeof(params), iphdr);	
-    if (!params.in) {
-        bpf_debug("Lookup failed? sport=%x, dport=%x\n", tcphdr->source, tcphdr->dest);
+    if (iphdr->daddr != ORIG_DEST_IP) {
+        bpf_debug("Packet is not sent to server (10.10.1.2 == %x), dest ip = %x\n", ORIG_DEST_IP, iphdr->daddr);
         goto out;
     }
-    bpf_debug("Lookup succeeded, dest: %x\n", params.in);
-    */
 
-    // Rewrite the destination IP address to be the returned destination.
-	iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, DEST_IP);
-	bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, DEST_IP);
-	tcphdr->check = incr_check_l(tcphdr->check, iphdr->daddr, DEST_IP);
-	bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, DEST_IP);
-	iphdr->daddr = DEST_IP;
+    // Rewrite the destination IP address to be the new destination.
+	iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, NEW_DEST_IP);
+	bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, NEW_DEST_IP);
+	tcphdr->check = incr_check_l(tcphdr->check, iphdr->daddr, NEW_DEST_IP);
+	bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, NEW_DEST_IP);
+	iphdr->daddr = NEW_DEST_IP;
 
     fib_params.family	= AF_INET;
 	fib_params.tos		= iphdr->tos;
@@ -123,8 +120,46 @@ int tc_ingress(struct __sk_buff *ctx)
     fib_params.ifindex = ctx->ingress_ifindex;
 
     rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
+    bpf_debug("fib lookup returned %x, expected %x\n", rc, BPF_FIB_LKUP_RET_SUCCESS);
 
-    bpf_debug("Got IPv4 TCP packet\n");
+	switch (rc) {
+	case BPF_FIB_LKUP_RET_SUCCESS:         /* lookup successful */
+		// No need to check nh_type since we only care about IPv4 here.
+		if(iphdr + 1 < data_end) {
+			ip_decrease_ttl(iphdr);
+		}
+
+        bpf_debug("original dest mac: %x, new dest mac: %x\n", eth->h_dest, fib_params.dmac);
+		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
+        bpf_debug("original src mac: %x, new src mac: %x\n", eth->h_source, fib_params.smac);
+		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
+		action = bpf_redirect(fib_params.ifindex, 0);
+        bpf_debug("Original action=%x, redirect action=%x\n", TC_ACT_OK, action);
+
+		break;
+	case BPF_FIB_LKUP_RET_BLACKHOLE:    /* dest is blackholed; can be dropped */
+	case BPF_FIB_LKUP_RET_UNREACHABLE:  /* dest is unreachable; can be dropped */
+	case BPF_FIB_LKUP_RET_PROHIBIT:     /* dest not allowed; can be dropped */
+        bpf_debug("dropping packet based on fib return: %x\n", rc);
+		action = TC_ACT_SHOT;
+		break;
+	case BPF_FIB_LKUP_RET_NOT_FWDED:    /* packet is not forwarded */
+        bpf_debug("BPF_FIB_LKUP_RET_NOT_FWDED\n");
+        break;
+	case BPF_FIB_LKUP_RET_FWD_DISABLED: /* fwding is not enabled on ingress */
+        bpf_debug("BPF_FIB_LKUP_RET_FWD_DISABLED\n");
+        break;
+	case BPF_FIB_LKUP_RET_UNSUPP_LWT:   /* fwd requires encapsulation */
+        bpf_debug("BPF_FIB_LKUP_RET_UNSUPP_LWT\n");
+        break;
+	case BPF_FIB_LKUP_RET_NO_NEIGH:     /* no neighbor entry for nh */
+        bpf_debug("BPF_FIB_LKUP_RET_NO_NEIGH\n");
+        break;
+	case BPF_FIB_LKUP_RET_FRAG_NEEDED:  /* fragmentation required to fwd */
+		/* PASS */
+        bpf_debug("passing packet based on fib return: %x\n", rc);
+		break;
+	}
 out:
     return action;
 }
