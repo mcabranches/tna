@@ -50,7 +50,7 @@ static inline __u16 incr_check_l(__u16 old_check, __u32 old, __u32 new)
 	return (~( (__u16)(l>>16) + (l&0xffff) ));
 }
 
-SEC("action")
+SEC("simple")
 int tc_ingress(struct __sk_buff *ctx)
 {
     // raw data ptrs
@@ -131,8 +131,8 @@ int tc_ingress(struct __sk_buff *ctx)
 
 		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
 		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
-		action = bpf_redirect(fib_params.ifindex, 0);
-        bpf_debug("Redirected packet.");
+		action = bpf_redirect_peer(fib_params.ifindex, 0); // TODO: bpf_redirect_peer...? or bpf_redirect_neigh...?
+        bpf_debug("Redirected packet: action=%x", action);
 		break;
 	case BPF_FIB_LKUP_RET_BLACKHOLE:    // dest is blackholed; can be dropped
 	case BPF_FIB_LKUP_RET_UNREACHABLE:  // dest is unreachable; can be dropped
