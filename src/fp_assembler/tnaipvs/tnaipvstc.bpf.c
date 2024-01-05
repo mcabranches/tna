@@ -81,13 +81,13 @@ int tc_ingress(struct __sk_buff *ctx)
     // Check that ethernet type is ipv4
     nh_type = parse_ethhdr(&nh, data_end, &eth);
     if (nh_type != bpf_htons(ETH_P_IP)) {
-        //bpf_debug("Not IPv4? %x, but expected %x\n", ctx->protocol, bpf_htons(ETH_P_IP));
+        bpf_debug("Not IPv4? %x, but expected %x\n", ctx->protocol, bpf_htons(ETH_P_IP));
         goto out;
     }
 
     nxthdr = parse_iphdr(&nh, data_end, &iphdr);
     if (nxthdr != IPPROTO_TCP) {
-        //bpf_debug("Not TCP? %x, but expected %x\n", nxthdr, IPPROTO_TCP);
+        bpf_debug("Not TCP? %x, but expected %x\n", nxthdr, IPPROTO_TCP);
         goto out;
     }
 
@@ -104,9 +104,9 @@ int tc_ingress(struct __sk_buff *ctx)
 
     // Rewrite the destination IP address to be the new destination.
 	iphdr->check = incr_check_l(iphdr->check, iphdr->daddr, NEW_DEST_IP);
-	//bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, NEW_DEST_IP);
+	bpf_debug("Forward IP check = %x, %x, %x\n", (__u16)iphdr->check, iphdr->daddr, NEW_DEST_IP);
 	tcphdr->check = incr_check_l(tcphdr->check, iphdr->daddr, NEW_DEST_IP);
-	//bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, NEW_DEST_IP);
+	bpf_debug("Forward TCP check = %x, %x, %x\n", tcphdr->check, iphdr->daddr, NEW_DEST_IP);
 	iphdr->daddr = NEW_DEST_IP;
 
     fib_params.family	= AF_INET;
@@ -120,7 +120,7 @@ int tc_ingress(struct __sk_buff *ctx)
     fib_params.ifindex = ctx->ingress_ifindex;
 
     rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
-    //bpf_debug("fib lookup returned %x, expected %x\n", rc, BPF_FIB_LKUP_RET_SUCCESS);
+    bpf_debug("fib lookup returned %x, expected %x\n", rc, BPF_FIB_LKUP_RET_SUCCESS);
 
 	switch (rc) {
 	case BPF_FIB_LKUP_RET_SUCCESS:         // lookup successful
@@ -131,7 +131,7 @@ int tc_ingress(struct __sk_buff *ctx)
 
 		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
 		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
-		action = bpf_redirect_peer(fib_params.ifindex, 0); // TODO: bpf_redirect_peer...? or bpf_redirect_neigh...?
+		action = bpf_redirect(fib_params.ifindex, 0); // TODO: bpf_redirect_peer...? but peer device must reside in different netns
         bpf_debug("Redirected packet: action=%x", action);
 		break;
 	case BPF_FIB_LKUP_RET_BLACKHOLE:    // dest is blackholed; can be dropped
