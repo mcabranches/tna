@@ -4371,7 +4371,7 @@ static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *) 194;
  * Returns
  * 	Code to control L2 forwarding
  */
-static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen, unsigned char *src_mac, unsigned char *dst_mac) = (void *) 186;
+static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen, unsigned char *src_mac, unsigned char *dst_mac) = (void *) 212;
 
 //m-> bpf_ipt_lookup
 /*
@@ -4382,7 +4382,7 @@ static long (*bpf_fdb_lookup)(void *ctx, struct bpf_fdb_lookup *params, int plen
  * Returns
  * 	Code to control forwarding based on IPtable filters
  */
-static long (*bpf_ipt_lookup)(void *ctx, struct bpf_ipt_lookup *params, int plen, struct iphdr *iph) = (void *) 187;
+static long (*bpf_ipt_lookup)(void *ctx, struct bpf_ipt_lookup *params, int plen, struct iphdr *iph) = (void *) 213;
 
 /*
  * bpf_ip_vs_lookup
@@ -4392,4 +4392,4 @@ static long (*bpf_ipt_lookup)(void *ctx, struct bpf_ipt_lookup *params, int plen
  * Returns
  * 	On success, zero. On error, a negative value.
  */
-static int (*bpf_ip_vs_lookup)(struct xdp_md *ctx, struct bpf_ip_vs_lookup *params, int plen, struct iphdr *iph) = (void *) 188;
+//static int (*bpf_ip_vs_lookup)(struct xdp_md *ctx, struct bpf_ip_vs_lookup *params, int plen, struct iphdr *iph) = (void *) 188;
