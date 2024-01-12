@@ -110,8 +110,23 @@ int tnartr(struct __sk_buff *ctx)
 	 	__builtin_memcpy(tna_meta.eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta.eth->h_source, fib_params.smac, ETH_ALEN);
 		
-    	//#bridge/vlan dependent
 		{% if fpms['config']['tnartr'] %}
+
+		//ipt dependent
+		{% if fpms['config']['tnartr']['has_ipt'] == '1' %}
+
+        tna_meta->ipt_params.ifindex = fib_params.ifindex;
+        tna_meta->ipt_params.egress_ifindex = tna_meta->fdb_params.egress_ifindex;
+        bpf_ipt_lookup(ctx, &tna_meta->ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta->iph);
+
+        //bpf_debug("verdict: %i\n", tna_meta->ipt_params.verdict);
+        if (tna_meta->ipt_params.verdict == 255)
+        	return XDP_DROP;
+
+		{% endif %}
+		//end of ipt dependent
+
+		//#bridge/vlan dependent
 		{% if fpms['config']['tnartr']['has_tnabr'] == '1' %}
 	 	tna_meta.fdb_params.vid = fib_params.h_vlan_TCI;
 
