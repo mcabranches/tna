@@ -131,6 +131,8 @@ class Tnatm {
                         interfaces[i].type = "phys";
                     tnaodb.tnaifs[interfaces[i].ifname] = interfaces[i];
                     tnaodb.tnartr->update_tna_rtr(&tnaodb.tnaifs[interfaces[i].ifname]);
+                    if (tnaodb.tnaipt->has_ipt())
+                        tnaodb.tnartr->has_ipt = 1;
                 }
             }
         }
@@ -146,7 +148,7 @@ class Tnatm {
 
         int deploy_tnafp(void)
         {
-            cout << "Updating TNA fast path" << endl;    
+            //cout << "Updating TNA fast path" << endl;    
 
             //update tna fp code
             call_tnafpa("tnabr");
@@ -166,7 +168,7 @@ class Tnatm {
 
         int _update_tna_topo(void)
 		{
-			cout << "Updating TNA topology" << endl;
+			//cout << "Updating TNA topology" << endl;
             string property_path = "config.dp_type";
             prev_tna_topo = tna_topo;
             tna_topo.clear();
@@ -203,6 +205,7 @@ class Tnatm {
             if (tnaodb.tnartr) {
                 fpms["tnartr"].push_back("tnartr");
                 tnaodb.tnartr->has_tnabr = has_tnabr;
+                tnaodb.tnartr->has_ipt = tnaodb.tnaipt->has_ipt();
 
                 tna_topo_add_rtr_config(tnaodb.tnartr->tnartr);
             }
@@ -321,7 +324,7 @@ class Tnatm {
             tna_topo.put(property_path, tnaodb.tnartr->has_tnabr);
 
             property_path = "config.tnartr.has_ipt";
-            tna_topo.put(property_path, "0");
+            tna_topo.put(property_path, tnaodb.tnartr->has_ipt);
 
             property_path = "config.tnartr.interfaces";
 
@@ -367,6 +370,7 @@ class Tnatm {
             pycmd = "cd ./src/fp_assembler && python3 tnasynth.py " + fpm + " '" + ss.str() + "'";
 
             //while (system(pycmd.c_str()));
+            //cout << pycmd.c_str() << endl;
             system(pycmd.c_str());
 
             return 0;

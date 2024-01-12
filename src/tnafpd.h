@@ -7,7 +7,7 @@
 #include "util.h"
 #include "tnafp.skel.h"
 #include "tnafp.tc.skel.h"
-
+#include <chrono>
 
 class Tnafpd {
 	public:
@@ -89,6 +89,12 @@ class Tnafpd {
 			_tna_fpd->fpm_dev_map = bpf_object__find_map_by_name(_tna_fpd->fpm_bpf_obj, "tx_port");
 
 			_tna_fpd->fpm_dev_map_fd = bpf_map__fd(_tna_fpd->fpm_dev_map);
+			auto currentTimePoint = std::chrono::system_clock::now();
+			//std::time_t currentTime = std::chrono::system_clock::to_time_t(currentTimePoint);
+			//auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(currentTimePoint.time_since_epoch()) % 1000;
+
+			//cout << "New DP loaded" << endl;
+			std::cout << currentTimePoint.time_since_epoch().count() << std::endl;
 
 			return 0;
 
@@ -115,7 +121,7 @@ class Tnafpd {
                 //process bridge interfaces
                 for (if_it = br_it->second.brifs.begin(); if_it !=  br_it->second.brifs.end(); ++if_it) {
                     if (if_it->second->op_state_str == "up") {                        
-						cout << "Installing tnabr" << endl;
+						//cout << "Installing tnabr" << endl;
 						if ((!tnaodb->tnaifs[if_it->second->ifname].fpm_set) && (tnaodb->tnaifs[if_it->second->ifname].ref_cnt > 0)) {
 		 					install_tnafp(if_it->second);
 							load_bpf_fpm(tnaodb->tnafpd["tnabr"], "tnabr");
@@ -130,12 +136,12 @@ class Tnafpd {
             //process router interfaces (we have only one router)
             for (if_it = tnaodb->tnartr->tnartr.rtrifs.begin(); if_it != tnaodb->tnartr->tnartr.rtrifs.end(); ++if_it) {
                  if (if_it->second->op_state_str == "up") {				   
-				    cout << "Installing tnartr" << endl;
-					if ((!tnaodb->tnaifs[if_it->second->ifname].fpm_set) && (tnaodb->tnaifs[if_it->second->ifname].ref_cnt > 0)) {
+				    //cout << "Installing tnartr" << endl;
+					//if ((!tnaodb->tnaifs[if_it->second->ifname].fpm_set) && (tnaodb->tnaifs[if_it->second->ifname].ref_cnt > 0)) {
 						install_tnafp(if_it->second);
 						load_bpf_fpm(tnaodb->tnafpd["tnartr"], "tnartr");
 						deploy_tnafpm(tnaodb->tnafpd["tnartr"], if_it->second);
-					}
+					//}
                  }
             }
 
@@ -180,7 +186,7 @@ class Tnafpd {
 
 			if (interface->fpm_set == 0) {
 				
-				cout << "Installing tnafp accel on interface: " << interface->ifindex << endl;
+				//cout << "Installing tnafp accel on interface: " << interface->ifindex << endl;
 
 				if (_fpm_hook == FPM_XDP)
 					err = util::install_xdp(skel->progs.xdp_tna_main_0, interface->ifindex, _flags);
@@ -203,7 +209,7 @@ class Tnafpd {
 		int uninstall_tnafp(struct tna_interface *interface) 
 		{
 			if (interface->fpm_set == 1) {
-				cout << "Uninstalling tnafp accel on interface: " << interface->ifindex << endl;
+				//cout << "Uninstalling tnafp accel on interface: " << interface->ifindex << endl;
 
 				if (_fpm_hook == FPM_XDP)
 					util::uninstall_xdp(interface->ifindex, _flags);

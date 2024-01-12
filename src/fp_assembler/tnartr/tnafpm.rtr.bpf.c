@@ -7,7 +7,7 @@
 #define AF_INET		2	/* Internet IP Protocol 	*/
 #define ETH_P_IP        0x0800                /* Internet Protocol packet        */
 #define TC_ACT_OK 0
-#define TC_ACT_SHOT 1
+#define TC_ACT_SHOT 2
 
 /* trace is written to /sys/kernel/debug/tracing/trace_pipe */
 #define bpf_debug(fmt, ...)                                             \
@@ -64,8 +64,8 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 }
 
 SEC("TNAFPM")
+int tnartr(struct xdp_md* ctx)
 
-int tnartr(struct __sk_buff *ctx)
 {
 	int rc;
 	void *data_end = (void *)(long)ctx->data_end;
@@ -91,16 +91,16 @@ int tnartr(struct __sk_buff *ctx)
 	tna_meta.vlh = (void *)(tna_meta.eth + 1);
 
 	if (tna_meta.vlh + 1 > data_end)
-						return TC_ACT_SHOT;
-			
+				return XDP_DROP;
+					
 	tna_meta.fdb_params.vid = 0;
 	struct bpf_fib_lookup fib_params = {0};
 
 	tna_meta.iph = nh.pos;
 
 	if (tna_meta.iph + 1 > data_end)
-						return TC_ACT_SHOT;
-		
+				return XDP_DROP;
+				
 
 	fib_params.family	= AF_INET;
 	fib_params.tos		= tna_meta.iph->tos;
@@ -121,26 +121,34 @@ int tnartr(struct __sk_buff *ctx)
 
 		if (!(tna_meta.eth)) {
 			//bpf_debug("Here4");
-									return TC_ACT_SHOT;
-			 
+						return XDP_DROP;
+						 
 		}
 
 	 	__builtin_memcpy(tna_meta.eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta.eth->h_source, fib_params.smac, ETH_ALEN);
-		
-    	//#bridge/vlan dependent
-						
-        //end of bridge/vlan dependent
 
-        //bridge dependent 
-	 	if (tna_meta.fdb_params.egress_ifindex > 0)
-	 		return bpf_redirect(tna_meta.fdb_params.egress_ifindex, 0);
+				            //#tnartr dependent
+		tna_meta.ipt_params.ifindex = fib_params.ifindex;
+		tna_meta.ipt_params.egress_ifindex = tna_meta.fdb_params.egress_ifindex;
+		bpf_ipt_lookup(ctx, &tna_meta.ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta.iph);
+
+		//#bpf_debug("verdict: %i\n", tna_meta.ipt_params.verdict);
+		if (tna_meta.ipt_params.verdict == 255)
+			return XDP_DROP;
+//#end of tnartr dependent 
+                		
+    	//#bridge/vlan dependent
+						if (fib_params.ifindex > 0)
+			return bpf_redirect(fib_params.ifindex, 0);
+				
+        //end of bridge/vlan dependent
 	}
-    //end of bridge dependent
+    
 
     //need to add a non bridge dependent redirect (pure l3)
-			return TC_ACT_OK;
-		
+		return XDP_PASS;
+			
 } 
 
 char _license[] SEC("license") = "GPL";

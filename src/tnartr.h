@@ -26,6 +26,7 @@ class Tnartr {
         struct tna_rtr tnartr; //just one per box
         int num_interfaces;
         int has_tnabr = 0;
+        int has_ipt = 0;
 
         int update_tna_rtr(struct tna_interface *interface)
         {

@@ -52,7 +52,7 @@ class Tnaipt {
         Tnaipt(void) 
         {
             init_tna_ipt();
-            install_ipt = last_install_ipt = false;
+            install_ipt = last_install_ipt = 0;
             pthread_create(&t1_tnipt, NULL, tna_mon_ipt, this);
         }
 
@@ -80,18 +80,21 @@ class Tnaipt {
         {
             int event_type = 0;
 
-            if (has_unsupported_rule() || (count_ipt_rules() == 0)) {
-                install_ipt = false;
-                if (install_ipt != last_install_ipt) {
-                    event_type = 1;
-                    last_install_ipt = false;
-                }
-            }
-            else if (count_ipt_rules() > 0) {
-                install_ipt = true;
+            //if (has_unsupported_rule() || (count_ipt_rules() == 0)) {
+            //    cout << "AAA" << endl;
+            //    install_ipt = false;
+            //    if (install_ipt != last_install_ipt) {
+            //        event_type = 1;
+            //        last_install_ipt = 0;
+            //    }
+           // }
+            //else if (count_ipt_rules() > 0) {
+            if (count_ipt_rules() > 6) {
+                install_ipt = 1;
+                //cout << "BBB" << endl;
                 if (install_ipt != last_install_ipt) {
                     event_type = 2;
-                    last_install_ipt = true;
+                    last_install_ipt = 1;
                 }
             }
             
@@ -112,8 +115,9 @@ class Tnaipt {
             return;
         }
 
-        bool has_ipt(void)
+        int has_ipt(void)
         {
+            //cout << "install_ipt: " << install_ipt << endl;            
             return install_ipt;
         }
 
@@ -128,8 +132,8 @@ class Tnaipt {
         struct tna_ipt tna_ipt;
         struct ipt_entry *e;
         pthread_t t1_tnipt;
-        bool install_ipt;
-        bool last_install_ipt; //detect change in ipt state
+        int install_ipt;
+        int last_install_ipt; //detect change in ipt state
 
         //TO-DO: change logic to detect a supported iptables rule
         static void *tna_mon_ipt(void *args)
@@ -176,6 +180,7 @@ class Tnaipt {
 
         void _refresh_tnaipt(void)
         {
+            //cout << "Here" << endl;
             unordered_map<string, struct tna_ipt_chain>::iterator ipt_chain_it;
             struct xtc_handle *h;
 
@@ -252,6 +257,7 @@ class Tnaipt {
                     total += count_ipt_rules_chain(ipt_chain_it->second);                       
                 }
             }
+            //cout << "total" << total << endl;
             return total;
         }
 

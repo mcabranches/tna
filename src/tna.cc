@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
     /* controller's main loop */
     while(!stop) {
-        cout << "..." << endl;
+        //cout << "..." << endl;
         /* this blocks and is awaken if an event happens */
         process_tna_event(&tnanl, &tnatm);
     }

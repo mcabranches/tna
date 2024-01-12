@@ -7,7 +7,7 @@
 #define AF_INET		2	/* Internet IP Protocol 	*/
 #define ETH_P_IP        0x0800                /* Internet Protocol packet        */
 #define TC_ACT_OK 0
-#define TC_ACT_SHOT 1
+#define TC_ACT_SHOT 2
 
 /* trace is written to /sys/kernel/debug/tracing/trace_pipe */
 #define bpf_debug(fmt, ...)                                             \
@@ -39,8 +39,8 @@ struct tna_meta_t {
 
 
 SEC("TNAFPM")
+int tnabr(struct xdp_md* ctx)
 
-int tnabr(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
@@ -75,19 +75,19 @@ int tnabr(struct __sk_buff *ctx)
 		//Is it possible to see if the port is untagged via the helper?
 		//if (tna_meta.fdb_params.egress_ifindex == 5)
 		//	vlan_tag_pop(ctx, tna_meta.eth);
-							return bpf_redirect(tna_meta.fdb_params.egress_ifindex, 0);
-			}
+					return bpf_redirect_map(&tx_port, tna_meta.fdb_params.egress_ifindex, 0);
+					}
 
 	if (tna_meta.fdb_params.flags == 0) { //STP learning
-						return TC_ACT_OK;
-			}
+				return XDP_PASS;
+					}
 
 	if (tna_meta.fdb_params.flags == 2) { //STP blocked
-						return TC_ACT_SHOT;
-			}
+				return XDP_DROP;
+					}
 
 	
-			return TC_ACT_OK;
-	}
+		return XDP_PASS;
+		}
 
 char _license[] SEC("license") = "GPL";

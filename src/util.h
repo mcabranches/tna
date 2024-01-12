@@ -89,6 +89,7 @@ struct tna_bridge {
 
 struct tna_rtr {
 	int has_rtr_br;
+	int has_ipt;
 	unordered_map<string, struct tna_interface *> rtrifs;
 };
 
@@ -156,7 +157,7 @@ namespace util {
 			return -1;
 	    }
 	    else {
-		    printf("XDP program loaded\n");
+		    //printf("XDP program loaded\n");
 	    }
 
 		return 0;

@@ -109,6 +109,12 @@ int tnartr(struct __sk_buff *ctx)
 
 	 	__builtin_memcpy(tna_meta.eth->h_dest, fib_params.dmac, ETH_ALEN);
 		__builtin_memcpy(tna_meta.eth->h_source, fib_params.smac, ETH_ALEN);
+
+		{% if fpms['config']['tnartr'] %}
+		{% if fpms['config']['tnartr']['has_ipt'] == '1' %}
+            {% include "tnaipt.fpm" %} 
+        {% endif %}
+        {% endif %}
 		
     	//#bridge/vlan dependent
 		{% if fpms['config']['tnartr'] %}

@@ -1,9 +1,9 @@
 //#tnartr dependent
-		tna_meta->ipt_params.ifindex = fib_params.ifindex;
-		tna_meta->ipt_params.egress_ifindex = tna_meta->fdb_params.egress_ifindex;
-		bpf_ipt_lookup(ctx, &tna_meta->ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta->iph);
+		tna_meta.ipt_params.ifindex = fib_params.ifindex;
+		tna_meta.ipt_params.egress_ifindex = tna_meta.fdb_params.egress_ifindex;
+		bpf_ipt_lookup(ctx, &tna_meta.ipt_params, sizeof(struct bpf_ipt_lookup), tna_meta.iph);
 
-		bpf_debug("verdict: %i\n", tna_meta->ipt_params.verdict);
-		if (tna_meta->ipt_params.verdict == 255)
+		//#bpf_debug("verdict: %i\n", tna_meta.ipt_params.verdict);
+		if (tna_meta.ipt_params.verdict == 255)
 			return XDP_DROP;
 //#end of tnartr dependent
