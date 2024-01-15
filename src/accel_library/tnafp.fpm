@@ -20,7 +20,7 @@
 
 struct {
 	__uint(type, BPF_MAP_TYPE_DEVMAP);
-	__uint(max_entries, 20);
+	__uint(max_entries, 200);
 	__type(key, int);
 	__type(value, int);
 } tx_port SEC(".maps");
