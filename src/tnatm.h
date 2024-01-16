@@ -13,7 +13,7 @@
 #include "tnaipt.h"
 #include "tnafpd.h"
 
-#define MAX_INTERFACES 32
+#define MAX_INTERFACES 200
 
 class Tnatm {
     public:
